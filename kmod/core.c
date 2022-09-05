@@ -573,7 +573,7 @@ static const net_device_ops_s xsockDevOps = {
     .ndo_stop             =  xsock_dev_down,
     .ndo_start_xmit       =  xsock_dev_start_xmit,
     .ndo_set_mac_address  =  NULL,
-    // TODO: SET MTU - NAO PODE SER MAIOR QUE A INTERFACE DE CIMA
+    // TODO: SET MTU - NAO EH PARA SETAR AQUI E SIM NO ROUTE
 };
 
 static void xsock_dev_setup (net_device_s* const dev) {
@@ -597,24 +597,24 @@ static void xsock_dev_setup (net_device_s* const dev) {
 }
 
 #if XSOCK_SERVER
-#define thisPath spath
-#define peerPath cpath
+#define this srv
+#define peer clt
 #else
-#define thisPath cpath
-#define peerPath spath
+#define this clt
+#define peer srv
 #endif
 
 static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, xsock_path_s* const restrict path, const uint pid, const xsock_cfg_node_s* const restrict cfg) {
 
-    const xsock_cfg_path_s* const cpath = &cfg->clt.paths[pid];
-    const xsock_cfg_path_s* const spath = &cfg->srv.paths[pid];
+    const xsock_cfg_path_s* const clt = &cfg->clt.paths[pid];
+    const xsock_cfg_path_s* const srv = &cfg->srv.paths[pid];
 
     printk("XSOCK: NODE %u: PATH %u: INITIALIZING\n"
         " THIS BAND %8u ITFC %16s MAC %02X:%02X:%02X:%02X:%02X:%02X GW %02X:%02X:%02X:%02X:%02X:%02X IP %u.%u.%u.%u PORT %5u\n"
-        " PEER BAND %8u ITFC %16s MAC %02X:%02X:%02X:%02X:%02X:%02X GW %02X:%02X:%02X:%02X:%02X:%02X IP %u.%u.%u.%u PORT %5u\n",
+        " PEER IP %u.%u.%u.%u PORT %5u\n",
         nid, pid,
-        thisPath->band, thisPath->itfc, _MAC(thisPath->mac), _MAC(thisPath->gw), _IP4(thisPath->addr), thisPath->port,
-        peerPath->band, peerPath->itfc, _MAC(peerPath->mac), _MAC(peerPath->gw), _IP4(peerPath->addr), peerPath->port
+        this->band, this->itfc, _MAC(this->mac), _MAC(this->gw), _IP4(this->addr), this->port,
+        _IP4(peer->addr), peer->port
     );
 
     path->flags =
@@ -635,17 +635,17 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
 #else
     path->reserved2  = 0;
 #endif
-    path->band       = thisPath->band;
-    path->uSrc       = BE16(thisPath->port);
-    path->uDst       = BE16(peerPath->port);
+    path->band       = this->band;
+    path->uSrc       = BE16(this->port);
+    path->uDst       = BE16(peer->port);
 
-    memcpy(path->eSrc, thisPath->mac, ETH_ALEN);
-    memcpy(path->eDst, thisPath->gw,  ETH_ALEN);
+    memcpy(path->eSrc, this->mac, ETH_ALEN);
+    memcpy(path->eDst, this->gw,  ETH_ALEN);
 
-    memcpy(path->iSrc, thisPath->addr, 4);
-    memcpy(path->iDst, peerPath->addr, 4);
+    memcpy(path->iSrc, this->addr, 4);
+    memcpy(path->iDst, peer->addr, 4);
 
-    net_device_s* const itfc = dev_get_by_name(&init_net, thisPath->itfc);
+    net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
     if (itfc) {
 
