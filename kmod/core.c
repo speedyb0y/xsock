@@ -596,18 +596,15 @@ static void xsock_dev_setup (net_device_s* const dev) {
         ;
 }
 
-#if XSOCK_SERVER
-#define this srv
-#define peer clt
-#else
-#define this clt
-#define peer srv
-#endif
-
 static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, xsock_path_s* const restrict path, const uint pid, const xsock_cfg_node_s* const restrict cfg) {
 
-    const xsock_cfg_path_s* const clt = &cfg->clt.paths[pid];
-    const xsock_cfg_path_s* const srv = &cfg->srv.paths[pid];
+#if XSOCK_SERVER
+    const xsock_cfg_path_s* const peer = &cfg->clt.paths[pid];
+    const xsock_cfg_path_s* const this = &cfg->srv.paths[pid];
+#else
+    const xsock_cfg_path_s* const this = &cfg->clt.paths[pid];
+    const xsock_cfg_path_s* const peer = &cfg->srv.paths[pid];
+#endif
 
     printk("XSOCK: NODE %u: PATH %u: INITIALIZING\n"
         " THIS BAND %8u ITFC %16s MAC %02X:%02X:%02X:%02X:%02X:%02X GW %02X:%02X:%02X:%02X:%02X:%02X IP %u.%u.%u.%u PORT %5u\n"
