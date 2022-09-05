@@ -138,11 +138,15 @@ typedef struct xsock_wire_s {
     u8  iSrc[4];
     u8  iDst[4];
 #define TCP_HDR_SIZE 20
-    u16 uSrc;
-    u16 uDst; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
     union {
-        u32 tSeq; // AS ORIGINAL TCP 
+        struct {
+            u16 tSrc;
+            u16 tDst;
+            u32 tSeq; // AS ORIGINAL TCP
+        };
         struct { // AS FAKE UDP
+            u16 uSrc;
+            u16 uDst; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
             u16 uSize;
             u16 uCksum;
         };
