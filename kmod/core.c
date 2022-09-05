@@ -581,22 +581,19 @@ static void xsock_dev_setup (net_device_s* const dev) {
     dev->netdev_ops      = &xsockDevOps;
     dev->header_ops      = &xsockHeaderOps;
     dev->type            = ARPHRD_NONE;
-    dev->hard_header_len = sizeof(xsock_path_s); // ETH_HLEN
-    dev->min_header_len  = sizeof(xsock_path_s);
-    dev->mtu             = ETH_DATA_LEN;
+    dev->addr_len        = 0;
+    dev->hard_header_len = ETH_HLEN;
+    dev->min_header_len  = ETH_HLEN;
     dev->min_mtu         = ETH_MIN_MTU;
     dev->max_mtu         = ETH_MAX_MTU;
-    dev->addr_len        = 0;
-    dev->tx_queue_len    = 0; // EFAULT_TX_QUEUE_LEN
+    dev->mtu             = ETH_MAX_MTU; // ETH_DATA_LEN
+    dev->tx_queue_len    = 0; // DEFAULT_TX_QUEUE_LEN
     dev->flags           = IFF_NOARP; // IFF_BROADCAST | IFF_MULTICAST
     dev->priv_flags      = IFF_NO_QUEUE
                          | IFF_LIVE_ADDR_CHANGE
                          | IFF_LIVE_RENAME_OK
                          | IFF_NO_RX_HANDLER
         ;
-    //////dev->mtu             = this->mtu - XSOCK_PATH_SIZE_WIRE + ETH_HLEN; // O ETHERNET HEADER NÃO É DESCONTADO NO MTU
-    //////dev->min_mtu         = this->mtu - XSOCK_PATH_SIZE_WIRE + ETH_HLEN; //   ...  E ALIÁS, JÁ SERIA COLOCADO UM MESMO
-    //////dev->max_mtu         = this->mtu - XSOCK_PATH_SIZE_WIRE + ETH_HLEN;
 }
 
 #if XSOCK_SERVER
