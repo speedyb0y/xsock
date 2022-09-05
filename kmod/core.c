@@ -139,26 +139,25 @@ typedef struct xsock_wire_s {
     u8  iDst[4];
 #define TCP_HDR_SIZE 20
     union {
-        struct {
+        struct { // AS ORIGINAL TCP
             u16 tSrc;
             u16 tDst;
-            u32 tSeq; // AS ORIGINAL TCP
+            u32 tSeq;
+            u32 tAck;
+            u16 tFlags;
+            u16 tWindow;
+            u16 tChecksum;
+            u16 tUrgent;
         };
         struct { // AS FAKE UDP
             u16 uSrc;
             u16 uDst; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
             u16 uSize;
             u16 uCksum;
-        };
-    };            
-    u32 tAck;
-    u16 tFlags;
-    u16 tWindow;
-    union {
-        u32 uSeq; // AS FAKE UDP
-        struct { // AS ORIGINAL TCP
-            u16 tChecksum;
-            u16 tUrgent;
+            u32 uAck;
+            u16 uFlags;
+            u16 uWindow;
+            u32 uSeq;
         };
     };
 } xsock_wire_s;
@@ -477,7 +476,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_wire_s* const wire = PTR(skb->data) + IP4_HDR_SIZE + TCP_HDR_SIZE - sizeof(xsock_wire_s);
 
     const uint nid = 0; // TODO: FIXME:
-    
+
 #if XSOCK_SERVER
     xsock_node_s* const node = &nodes[nid];
 #endif
@@ -693,7 +692,7 @@ static void xsock_node_init (const xsock_cfg_node_s* const cfg) {
 #else
     const xsock_cfg_node_side_s* const this = &cfg->clt;
 #endif
-                   
+
     printk("XSOCK: NODE %u: INITIALIZING WITH PKTS %u\n",
         nid, this->pkts);
 
@@ -734,7 +733,7 @@ static int __init xsock_init(void) {
         free_netdev(dev);
         return -1;
     }
-    
+
     xdev = dev;
 
     // INITIALIZE NODE(S)
@@ -756,7 +755,7 @@ static void __exit xsock_exit(void) {
     if (xdev) {
         unregister_netdev(xdev);
         free_netdev(xdev);
-    }        
+    }
 }
 
 module_init(xsock_init);
