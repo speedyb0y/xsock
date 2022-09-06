@@ -397,35 +397,31 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_conn_s* const conn = &conns[cid];
 
     // CHOOSE PATH
-    const xsock_path_s* path;
-
-    if (conn->remaining) {
-        conn->remaining--;
-        path = &conn->paths[conn->pid];
-    } else {
-        // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
-        // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
-        // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
-        uint remaining;
-        uint c = XSOCK_PATHS_N;
-        uint pid = conn->pid;
-        do { pid = (pid + 1) % XSOCK_PATHS_N;
-            path = &conn->paths[pid];
-            remaining = path->pkts * (
-                path->isUp &&
-                path->isUpAuto &&
-                path->isUpItfc &&
-                path->itfc &&
-                path->itfc->flags & IFF_UP
-            );
-        } while (!remaining && --c);
-        // DROP SE NÃO ACHOU NENHUM
-        if (!remaining)
-            goto drop;
-        // STORE THE CHANGES
-        conn->remaining = remaining;
-        conn->pid = pid;
+    // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
+    // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
+    // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
+    const u64 now = jiffies;
+    uint pid = conn->pid;
+    const xsock_path_s* path = &conn->paths[pid];
+    uint isOk = (conn->last + (HZ/2)) < now;
+    uint c = XSOCK_PATHS_N;    
+    while (!isOk && c--) {
+        pid = (pid + 1) % XSOCK_PATHS_N;
+        path = &conn->paths[pid];
+        isOk = 
+            path->isUp &&
+            path->isUpAuto &&
+            path->isUpItfc &&
+            path->itfc &&
+            path->itfc->flags & IFF_UP
+        ;
     }
+    // DROP SE NÃO ACHOU NENHUM
+    if (!isOk)
+        goto drop;
+    // STORE THE CHANGES
+    conn->last = now;
+    conn->pid = pid;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
