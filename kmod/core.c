@@ -87,13 +87,6 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #error "BAD XSOCK_SERVER_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
 #endif
 
-#define XSOCK_PATH_F_UP              0b0000000000000001U // ADMINISTRATIVELY
-#define XSOCK_PATH_F_UP_AUTO         0b0000000000000010U // SE DER TIMEOUT VAI DESATIVAR ISSO
-#define XSOCK_PATH_F_UP_ITFC         0b0000000000000100U // WATCH INTERFACE EVENTS AND SET THIS TODO: INICIALIZAR COMO 0 E CARREGAR ISSO NO DEVICE NOTIFIER
-
-#define FLAGS_IS_UP(f) (((f) & (XSOCK_PATH_F_UP | XSOCK_PATH_F_UP_AUTO | XSOCK_PATH_F_UP_ITFC)) \
-                            == (XSOCK_PATH_F_UP | XSOCK_PATH_F_UP_AUTO | XSOCK_PATH_F_UP_ITFC))
-
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
@@ -150,7 +143,10 @@ typedef struct xsock_path_s {
 #else
     u64 reserved;
 #endif
-    u32 flags;
+    u32 isUp:1, // ADMINISTRATIVELY
+        isUpAuto:1, // SE DER TIMEOUT VAI DESATIVAR ISSO
+        isUpItfc:1, // WATCH INTERFACE EVENTS AND SET THIS TODO: INICIALIZAR COMO 0 E CARREGAR ISSO NO DEVICE NOTIFIER
+        flags:29;
     u32 pkts;
     u8  saddr[4];
     u8  daddr[4];
@@ -293,8 +289,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     xsock_path_s* const path = &conn->paths[pid];
 
     // DETECT AND UPDATE PATH AVAILABILITY
-    if (unlikely(!(path->flags &  XSOCK_PATH_F_UP_AUTO))) {
-                   path->flags |= XSOCK_PATH_F_UP_AUTO; // TODO: FIXME: IMPLEMENTAR E USAR ISSO
+    if (unlikely(!path->isUpAuto)) {
+                  path->isUpAuto = true; // TODO: FIXME: IMPLEMENTAR E USAR ISSO
         xsock_conn_flows_update(conn);
     }
 #if XSOCK_SERVER
@@ -302,10 +298,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // NOTE: O SERVER NÃO PODE RECEBER ALEATORIAMENTE COM  UM MESMO IP EM MAIS DE UMA INTERACE, SENÃO VAI FICAR TROCANDO TODA HORA AQUI
     const u64 hash = (u64)(uintptr_t)skb->dev
-      + (*(u64*)wire->eth.dst) // VAI PEGAR UM PEDAÇO DO eSrc
-      + (*(u64*)wire->eth.src) // VAI PEGAR O eType
-      + (*(u64*)wire->ip.src) // VAI PEGAR O iDst
-      + (       wire->udp.src)
+      + *(u64*)wire->eth.dst // VAI PEGAR UM PEDAÇO DO eSrc
+      + *(u64*)wire->eth.src // VAI PEGAR O eType
+      + *(u64*)wire->ip.src // VAI PEGAR O iDst
+      +        wire->udp.src
     ;
 
     if (unlikely(path->hash != hash)) {
@@ -388,7 +384,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         uint pid = conn->pid;
         do { pid = (pid + 1) % XSOCK_PATHS_N;
             path = &conn->paths[pid];
-            remaining = path->pkts * (FLAGS_IS_UP(path->flags) && path->itfc && path->itfc->flags & IFF_UP);
+            remaining = path->pkts * (
+                path->isUp &&
+                path->isUpAuto &&
+                path->isUpItfc &&
+                path->itfc &&
+                path->itfc->flags & IFF_UP
+            );
         } while (!remaining && --c);
         // DROP SE NÃO ACHOU NENHUM
         if (!remaining)
@@ -497,17 +499,17 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
         _MAC(this->gw),  _IP4(peer->addr)
     );
 
-    path->flags =
-          (XSOCK_PATH_F_UP          * !0)
-        | (XSOCK_PATH_F_UP_AUTO     * !0)
-        ;
-    path->itfc       = NULL;
+    path->flags     =  0;
+    path->isUp      = !0;
+    path->isUpAuto  = !0;
+    path->isUpItfc  = !0;
+    path->itfc      =  NULL;
 #if XSOCK_SERVER
-    path->hash       = 0;
+    path->hash      = 0;
 #else
-    path->reserved2  = 0;
+    path->reserved2 = 0;
 #endif
-    path->pkts       = this->pkts;
+    path->pkts      = this->pkts;
 
     memcpy(path->mac, this->mac, ETH_ALEN);
     memcpy(path->gw,  this->gw,  ETH_ALEN);
@@ -539,7 +541,7 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
         rtnl_unlock();
 
         if (path->itfc) { // TODO:
-            path->flags |= XSOCK_PATH_F_UP_ITFC;
+            path->isUpItfc = true;
         } else { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
             printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT HOOKED\n", cid, pid);
             dev_put(itfc);
