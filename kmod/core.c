@@ -372,7 +372,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if ((payload + payloadSize) > SKB_TAIL(skb))
         goto drop;
 
-    // DECRYPT AND CONFIRM AUTHENTICITY
+    // DECRYPT AND CONFIRM INTEGRITY AND AUTHENTICITY
     if (xsock_crypto_decode(payload, payloadSize) != wire->ip.hash)
         goto drop;
 
@@ -380,7 +380,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // DETECT AND UPDATE PATH AVAILABILITY
     if (unlikely(!(path->flags & XSOCK_PATH_F_UP_AUTO))) {
-        path->flags |= XSOCK_PATH_F_UP_AUTO; // TODO: FIXME: IMPLEMENTAR E USAR ISSO
+                   path->flags |= XSOCK_PATH_F_UP_AUTO; // TODO: FIXME: IMPLEMENTAR E USAR ISSO
         xsock_node_flows_update(node);
     }
 #if XSOCK_SERVER
@@ -638,7 +638,7 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
 
     memcpy(path->saddr, this->addr, 4);
     memcpy(path->daddr, peer->addr, 4);
-                                   
+
     net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
     if (itfc) {
