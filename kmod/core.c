@@ -360,6 +360,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (PTR(&wire->eth) < PTR(skb->head))
         goto drop;
 
+    if (wire->tcp.urgent)
+        goto drop;
+
 #if XSOCK_SERVER
     const uint cid = wire->ip.dst[3];
 #else
