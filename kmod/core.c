@@ -376,7 +376,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // CHOOSE PATH
     // ENVIA flowPackets, E AÍ AVANCA flowShift
     if (conn->remaining == 0)
-        conn->remaining = conn->paths[(++(conn->pid)) % XSOCK_PATHS_N].pkts;
+        conn->remaining = conn->paths[(conn->pid = (conn->pid + 1) % XSOCK_PATHS_N)].pkts;
     else
         conn->remaining--;
 
