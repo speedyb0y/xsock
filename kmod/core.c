@@ -300,8 +300,7 @@ static void xsock_node_flows_update (xsock_node_s* const node) {
 
     if (total) {
         do {
-            for (uint q = ( (uintll)XSOCK_FLOWS_N * FLAGS_IS_UP(node->paths[pid].flags) * node->paths[pid].band
-                ) / total; q; q--)
+            for (uint q = ((uintll)XSOCK_FLOWS_N * FLAGS_IS_UP(node->paths[pid].flags) * node->paths[pid].band) / total; q; q--)
                 *flow++ = pid;
             pid = (pid + 1) % XSOCK_PATHS_N;
         } while (flow != &node->flows[XSOCK_FLOWS_N] && pid != maiorP);
