@@ -124,7 +124,7 @@ typedef struct xsock_wire_s {
             u32 ack;
             u16 flags;
             u16 window;
-            u16 checksum;
+            u16 cksum;
             u16 urgent;
         } tcp;
         struct xsock_wire_udp_s { // AS FAKE UDP
@@ -326,6 +326,16 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // DESENCAPSULA
+    wire->ip.protocol = IPPROTO_TCP;
+ // wire->ip.cksum
+    //wire->ip.src = ;
+    //wire->ip.dst = ;
+ // wire->tcp.src
+ // wire->tcp.dst
+    wire->tcp.seq = wire->udp.seq;
+ // wire->tcp.cksum
+    wire->tcp.urgent = 0;
+
     skb->ip_summed = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
     skb->mac_len   = 0;
     skb->dev       = xdev;
