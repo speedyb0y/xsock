@@ -123,7 +123,6 @@ typedef struct xsock_wire_s {
         u8  src[ETH_ALEN];
         u16 type;
     } eth;
-#define IP4_HDR_SIZE 20
     struct xsock_wire_ip_s {
         u8  version;
         u8  tos;
@@ -707,6 +706,11 @@ static int __init xsock_init(void) {
 #else
     printk("XSOCK: CLIENT INIT\n");
 #endif
+
+    BUILD_BUG_ON(sizeof(struct xsock_wire_eth_s) != ETH_HLEN);
+    BUILD_BUG_ON(sizeof(struct xsock_wire_ip_s) != sizeof(struct iphdr));
+    BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
+    BUILD_BUG_ON(sizeof(struct xsock_wire_udp_s) != sizeof(struct xsock_wire_tcp_s));
 
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
