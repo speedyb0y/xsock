@@ -106,13 +106,8 @@ typedef struct xsock_wire_s {
         u8  ttl;
         u8  protocol;
         u16 cksum;
-        union {
-            u64 addrs;
-            struct {
-                u8  src[4];
-                u8  dst[4];
-            };
-        };
+        u8  src[4];
+        u8  dst[4];
     } ip;
     union {
         struct xsock_wire_tcp_s { // AS ORIGINAL TCP
@@ -153,20 +148,11 @@ typedef struct xsock_path_s {
         isUpItfc:1, // WATCH INTERFACE EVENTS AND SET THIS TODO: INICIALIZAR COMO 0 E CARREGAR ISSO NO DEVICE NOTIFIER
         flags:29;
     u32 pkts;
-    union {
-        u64 addrs;
-        struct {
-            u8  saddr[4];
-            u8  daddr[4];
-        };
-    };
-    struct xsock_path_eth_s {
-        u8  gw[ETH_ALEN];
-        u8  mac[ETH_ALEN];
-        u16 type;
-        u8  iVersion;
-        u8  iTOS;
-    } eth;
+    u8  saddr[4];
+    u8  daddr[4];
+    u8  gw[ETH_ALEN];
+    u8  mac[ETH_ALEN];
+    u32 reserved6_; // IP VERSION + TOS
     u64 reserved2;
     u64 reserved3;
 } xsock_path_s;
@@ -419,10 +405,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     // ENCRYPT AND AUTHENTIFY
     // RE-ENCAPSULATE
-    memcpy(&wire->eth, &path->gw, 16);
+    memcpy(wire->eth.src, path->mac, ETH_ALEN);
+    memcpy(wire->eth.dst, path->gw,  ETH_ALEN);
+    memcpy(wire->ip.src,  path->saddr, 4);
+    memcpy(wire->ip.dst,  path->daddr, 4);
+    wire->eth.type = 0;
     wire->ip.hash = xsock_crypto_encode(payload, size);
     wire->ip.protocol = IPPROTO_UDP;
-    wire->ip.addrs = path->addrs;
     wire->ip.cksum = 0;
     wire->ip.cksum = ip_fast_csum(PTR(&wire->ip), 5);
     wire->udp.seq = wire->tcp.seq;
@@ -464,7 +453,7 @@ static int xsock_dev_down (net_device_s* const dev) {
     return 0;
 }
 
-static int xsock_dev_header_create (sk_buff_s *skb, net_device_s *dev, unsigned short type, const void *daddr, const void *saddr, uint len) {
+static int xsock_dev_header_create (sk_buff_s *skb, net_device_s *dev, unsigned short type, const void *dst, const void *src, uint len) {
 
     return 0;
 }
@@ -532,9 +521,8 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
 #endif
     path->pkts      = this->pkts;
 
-    memcpy(path->mac, this->mac, ETH_ALEN);
-    memcpy(path->gw,  this->gw,  ETH_ALEN);
-
+    memcpy(path->mac,   this->mac, ETH_ALEN);
+    memcpy(path->gw,    this->gw,  ETH_ALEN);
     memcpy(path->saddr, this->addr, 4);
     memcpy(path->daddr, peer->addr, 4);
 
