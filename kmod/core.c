@@ -368,7 +368,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
     const uint payloadSize = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->udp);
 
-    // INCOMPLETE PAYLOADS
+    // DROP INCOMPLETE PAYLOADS
     if ((payload + payloadSize) > SKB_TAIL(skb))
         goto drop;
 
