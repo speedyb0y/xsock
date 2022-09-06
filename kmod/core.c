@@ -375,12 +375,20 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
-static inline void path_on (xsock_conn_s* const conn, const uint i) {
+// ALGUMA COISA FOI SETADA
+static inline void xsock_conn_path_on (xsock_conn_s* const restrict conn, const xsock_path_s* const restrict path, const uint i) {
 
-    conn->pathsOn |= (0b00010001U << i);
+    conn->pathsOn |= (0b00010001U << i) * (
+        path->isUp &&
+        path->isUpAuto &&
+        path->isUpItfc &&
+        path->itfc &&
+        path->itfc->flags & IFF_UP
+    );
 }
 
-static inline void path_off (xsock_conn_s* const conn, const uint i) {
+// ALGUMA COISA FOI ZERADA
+static inline void xsock_conn_path_off (xsock_conn_s* const conn, const uint i) {
 
     conn->pathsOn &= ~(0b00010001U << i);
 }
