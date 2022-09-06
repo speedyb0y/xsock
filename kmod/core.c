@@ -83,7 +83,7 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #define PORT_PID(port) (((port) - XSOCK_SERVER_PORT) % 10)
 
 //
-#if XSOCK_SERVER && PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
+#if PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
 #error "BAD XSOCK_SERVER_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
 #endif
 
