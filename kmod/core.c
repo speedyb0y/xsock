@@ -90,47 +90,65 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
-typedef struct xsock_wire_s {
-    u8 _align[10];
-    struct xsock_wire_eth_s {
-        u8  dst[ETH_ALEN];
-        u8  src[ETH_ALEN];
-        u16 type;
-    } eth;
-    struct xsock_wire_ip_s {
-        u8  version;
-        u8  tos;
-        u16 size;
-        u16 hash; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
-        u16 frag;
-        u8  ttl;
-        u8  protocol;
-        u16 cksum;
-        u8  src[4];
-        u8  dst[4];
-    } ip;
-    union {
-        struct xsock_wire_tcp_s { // AS ORIGINAL TCP
-            u16 src;
-            u16 dst;
-            u32 seq;
-            u32 ack;
-            u16 flags;
-            u16 window;
-            u16 cksum;
-            u16 urgent;
-        } tcp;
-        struct xsock_wire_udp_s { // AS FAKE UDP
-            u16 src;
-            u16 dst;
+typedef union xsock_wire_s {
+    struct {
+        u8 _align[10];
+        struct xsock_wire_eth_s {
+            u8  dst[ETH_ALEN];
+            u8  src[ETH_ALEN];
+            u16 type;
+        } eth;
+        struct xsock_wire_ip_s {
+            u8  version;
+            u8  tos;
             u16 size;
+            u16 hash; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
+            u16 frag;
+            u8  ttl;
+            u8  protocol;
             u16 cksum;
-            u32 ack;
-            u16 flags;
-            u16 window;
-            u32 seq;
-        } udp;
+            u8  src[4];
+            u8  dst[4];
+        } ip;
+        union {
+            struct xsock_wire_tcp_s { // AS ORIGINAL TCP
+                u16 src;
+                u16 dst;
+                u32 seq;
+                u32 ack;
+                u16 flags;
+                u16 window;
+                u16 cksum;
+                u16 urgent;
+            } tcp;
+            struct xsock_wire_udp_s { // AS FAKE UDP
+                u16 src;
+                u16 dst;
+                u16 size;
+                u16 cksum;
+                u32 ack;
+                u16 flags;
+                u16 window;
+                u32 seq;
+            } udp;
+        };
     };
+    struct {
+        u8 _align[10];    
+        u16 eth[8];
+        u16 isize;
+        u16 ihash;
+        u16 ifrag;
+        u16 ittlProtocol;
+        u16 icksum;
+        u8  iaddrs[8];
+        u32 uports;
+        u16 usize;
+        u16 ucksum;
+        u32 ack;
+        u32 flagsWindow;
+        u32 useq;
+    } fast;
 } xsock_wire_s;
 
 // EXPECTED SIZE
@@ -148,11 +166,22 @@ typedef struct xsock_path_s {
         isUpItfc:1, // WATCH INTERFACE EVENTS AND SET THIS TODO: INICIALIZAR COMO 0 E CARREGAR ISSO NO DEVICE NOTIFIER
         flags:29;
     u32 pkts;
-    u8  saddr[4];
-    u8  daddr[4];
-    u8  gw[ETH_ALEN];
-    u8  mac[ETH_ALEN];
-    u32 reserved6_; // IP VERSION + TOS
+    union {
+            u8 iaddrs[8];
+        struct {
+            u8  saddr[4];
+            u8  daddr[4];
+        };
+    };
+    union {
+            u8  eth[16];
+        struct {
+            u8  gw[ETH_ALEN];
+            u8  mac[ETH_ALEN];
+            u16 etype;
+            u16 ivt; // IP VERSION + TOS
+        };
+    };
     u64 reserved2;
     u64 reserved3;
 } xsock_path_s;
@@ -405,20 +434,17 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     // ENCRYPT AND AUTHENTIFY
     // RE-ENCAPSULATE
-    memcpy(wire->eth.src, path->mac, ETH_ALEN);
-    memcpy(wire->eth.dst, path->gw,  ETH_ALEN);
-    memcpy(wire->ip.src,  path->saddr, 4);
-    memcpy(wire->ip.dst,  path->daddr, 4);
-    wire->eth.type = BE16(ETH_P_IP);
-    wire->ip.hash = xsock_crypto_encode(payload, size);
-    wire->ip.protocol = IPPROTO_UDP;
-    wire->ip.cksum = 0;
-    wire->ip.cksum = ip_fast_csum(PTR(&wire->ip), 5);
-    wire->udp.seq = wire->tcp.seq;
-    wire->udp.size  = BE16(sizeof(wire->udp) + size);
-    wire->udp.cksum = 0;
- // wire->tcp.src
- // wire->tcp.dst
+    //wire->fast.eth[6] = path->eth[6]; // BE16(ETH_P_IP); TODO:
+    //wire->fast.eth[7] = path->eth[7]; // 0x45 0x00 TODO:
+    memcpy(wire->fast.eth,    path->eth, 16);
+    memcpy(wire->fast.iaddrs, path->iaddrs, 8);
+           wire->fast.ihash        = xsock_crypto_encode(payload, size);
+           wire->fast.ittlProtocol = 0x1111U; // IPPROTO_UDP
+           wire->fast.icksum       = 0;
+           wire->fast.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
+           wire->fast.useq         = wire->tcp.seq;
+           wire->fast.usize        = BE16(sizeof(wire->udp) + size);
+           wire->fast.ucksum       = 0;
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
