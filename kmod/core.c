@@ -396,7 +396,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     ;
 
     if (unlikely(path->hash != hash)) {
-                 path->hash = hash;
+                 path->hash =  hash;
 
         if (path->flags & XSOCK_PATH_F_ITFC_LEARN) // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
             path->itfc = itfc;
@@ -420,30 +420,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     }
 #endif
 
-    // NOTE: MAKE SURE WE DO THE EQUIVALENT OF TRIM
-    // pskb_trim(skb, payloadSize);
-
     // DESENCAPSULA
-    skb->ip_summed        = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
-    skb->mac_len          = 0;
-    skb->len              = payloadSize;
-    skb->data             = PTR(payload);
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
-    skb->mac_header       =
-    skb->network_header   =
-    skb->transport_header = PTR(payload) - PTR(skb->head);
-    skb->tail             = PTR(payload) - PTR(skb->head) + payloadSize;
-#else
-    skb->mac_header       =
-    skb->network_header   =
-    skb->transport_header = PTR(payload);
-    skb->tail             = PTR(payload) + payloadSize;
-#endif
-    skb->dev              = xdev;
-    skb->protocol         =
-        (*(u8*)payload & 0b0100000U) ?
-            BE16(ETH_P_IPV6) :
-            BE16(ETH_P_IP);
+    skb->ip_summed = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
+    skb->mac_len   = 0;
+    skb->dev       = xdev;
 
     return RX_HANDLER_ANOTHER;
 
