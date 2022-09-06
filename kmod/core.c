@@ -235,7 +235,7 @@ static u16 xsock_crypto_decode (void* restrict data, uint size) {
 
 static void xsock_conn_flows_update (xsock_conn_s* const conn) {
 
-    // TODO: FIXME:
+    // TODO: FIXME: SE O conn->pid ATUAL NAO ESTIVER DISPONIVEL, COLCOAR OUTRO
 
     printk("XSOCK: CONN %u: FLOWS UPDATED: PID %llu REMAINING %llu\n",
         CONN_ID(conn), (uintll)conn->pid, (uintll)conn->remaining);
@@ -299,10 +299,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     }
 #if XSOCK_SERVER
     // DETECT AND UPDATE PATH CHANGES
-    net_device_s* const itfc = skb->dev;
 
     // NOTE: O SERVER NÃO PODE RECEBER ALEATORIAMENTE COM  UM MESMO IP EM MAIS DE UMA INTERACE, SENÃO VAI FICAR TROCANDO TODA HORA AQUI
-    const u64 hash = (u64)(uintptr_t)itfc
+    const u64 hash = (u64)(uintptr_t)skb->dev
       + (*(u64*)wire->eth.dst) // VAI PEGAR UM PEDAÇO DO eSrc
       + (*(u64*)wire->eth.src) // VAI PEGAR O eType
       + (*(u64*)wire->ip.src) // VAI PEGAR O iDst
@@ -310,12 +309,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     ;
 
     if (unlikely(path->hash != hash)) {
-                 path->hash =  hash;        
-                 path->itfc = itfc; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-        memcpy(path->mac, wire->eth.dst, ETH_ALEN);
-        memcpy(path->gw, wire->eth.src, ETH_ALEN);
-        memcpy(path->saddr, wire->ip.dst, 4);
-        memcpy(path->daddr, wire->ip.src, 4);
+                 path->hash =  hash;
+                 path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
+          memcpy(path->mac,   wire->eth.dst, ETH_ALEN);
+          memcpy(path->gw,    wire->eth.src, ETH_ALEN);
+          memcpy(path->saddr, wire->ip.dst, 4);
+          memcpy(path->daddr, wire->ip.src, 4);
 
         printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n"
