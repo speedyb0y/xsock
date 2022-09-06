@@ -435,16 +435,6 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
-#if 0
-#define V4_PROTO_SOURCE        0x00FF0000FFFFFFFFULL
-#define V6_VERSION_FLOW_PROTO  0xF00FFFFF0000FF00ULL
-#define V6_PORTS               0xFFFFFFFF00000000ULL
-#else
-#define V4_PROTO_SOURCE        0xFFFFFFFF0000FF00ULL
-#define V6_VERSION_FLOW_PROTO  0x00FF0000FFFF0FF0ULL
-#define V6_PORTS               0x00000000FFFFFFFFULL
-#endif
-
 static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
 
     if (skb_linearize(skb))
