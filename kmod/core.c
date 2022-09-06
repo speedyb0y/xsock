@@ -191,8 +191,9 @@ typedef struct xsock_path_s {
 
 typedef struct xsock_conn_s {
     u64 pid;
-    u64 remaining;
-    u64 _align[6];
+    u64 last; // LAST TIME A PACKET WAS SENT
+    u64 pathsOn;
+    u64 _align[5];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
 
@@ -374,6 +375,21 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
+static inline void path_on (xsock_conn_s* const conn, const uint i) {
+
+    conn->pathsOn |= (0b00010001U << i);
+}
+
+static inline void path_off (xsock_conn_s* const conn, const uint i) {
+
+    conn->pathsOn &= ~(0b00010001U << i);
+}
+
+static inline uint path_first (const xsock_conn_s* const conn) {
+
+    return __builtin_ctz(conn->pathsOn);
+}
+
 static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
 
     if (skb_linearize(skb))
@@ -397,25 +413,32 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_conn_s* const conn = &conns[cid];
 
     // CHOOSE PATH
+
+    // DROP SE NÃO TIVER NENHUM
+    if (!conn->pathsOn)
+        goto drop;
+
     // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
     // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
     // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
-    const u64 now = jiffies;
-
-    const uint pid = conn->pid + ((conn->last + (HZ/2)) < now);
-    
                 //path->isUp &&
             //path->isUpAuto &&
             //path->isUpItfc &&
             //path->itfc
-        isOk = (path = &conn->paths[(pid = (pid + 1) % XSOCK_PATHS_N)])->isOk;
-    // DROP SE NÃO ACHOU NENHUM
-    if (pid >= XSOCK_PATHS_N)
-        goto drop;
-    // STORE THE CHANGES
-    conn->pid = pid;
+
+    const u64 now = jiffies;
+
+    uint pid = conn->pid;
+
+    if ((conn->last + (HZ/2)) < now) {
+        pid++;
+        pid += __builtin_ctz(conn->pathsOn >> pid);
+        pid %= XSOCK_PATHS_N;
+        conn->pid = pid;
+    }
+
     conn->last = now;
-    
+
     const xsock_path_s* const path = &conn->paths[pid];
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
