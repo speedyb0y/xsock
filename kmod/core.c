@@ -106,8 +106,13 @@ typedef struct xsock_wire_s {
         u8  ttl;
         u8  protocol;
         u16 cksum;
-        u8  src[4];
-        u8  dst[4];
+        union {
+            u64 addrs;
+            struct {
+                u8  src[4];
+                u8  dst[4];
+            };
+        };
     } ip;
     union {
         struct xsock_wire_tcp_s { // AS ORIGINAL TCP
@@ -148,13 +153,20 @@ typedef struct xsock_path_s {
         isUpItfc:1, // WATCH INTERFACE EVENTS AND SET THIS TODO: INICIALIZAR COMO 0 E CARREGAR ISSO NO DEVICE NOTIFIER
         flags:29;
     u32 pkts;
-    u8  saddr[4];
-    u8  daddr[4];
-    u8  mac[ETH_ALEN];
-    u8  gw[ETH_ALEN];
-    u16 eType;
-    u8  iVersion;
-    u8  iTOS;
+    union {
+        u64 addrs;
+        struct {
+            u8  saddr[4];
+            u8  daddr[4];
+        };
+    };
+    struct xsock_path_eth_s {
+        u8  gw[ETH_ALEN];
+        u8  mac[ETH_ALEN];
+        u16 type;
+        u8  iVersion;
+        u8  iTOS;
+    } eth;
     u64 reserved2;
     u64 reserved3;
 } xsock_path_s;
@@ -283,6 +295,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT AND CONFIRM INTEGRITY AND AUTHENTICITY
+    // TODO: E QUANTO AOS PAYLOADS SIZE 0? CONSIDERAR OS TCP SEQUENCE NUMBERS
     if (xsock_crypto_decode(payload, payloadSize) != wire->ip.hash)
         goto drop;
 
@@ -321,7 +334,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     }
 #endif
 
-    // DESENCAPSULA
+    // RE-ENCAPSULATE
     wire->ip.protocol = IPPROTO_TCP;
  // wire->ip.cksum
     //wire->ip.src = ;
@@ -353,10 +366,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->tcp) - sizeof(xsock_wire_s);
 
-    if (PTR(&wire->eth) < PTR(skb->head))
-        goto drop;
-
-    if (wire->tcp.urgent)
+    if (PTR(&wire->eth) < PTR(skb->head)
+     || wire->ip.version != 0x45
+     || wire->tcp.urgent)
         goto drop;
 
 #if XSOCK_SERVER
@@ -405,10 +417,19 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
     const uint size = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->tcp);
 
-    // RE-ENCAPSULATE, ENCRYPT AND AUTHENTIFY
+    // ENCRYPT AND AUTHENTIFY
+    // RE-ENCAPSULATE
+    memcpy(&wire->eth, &path->gw, 16);
     wire->ip.hash = xsock_crypto_encode(payload, size);
-    wire->udp.size  = BE16(sizeof(wire->udp) + size);
+    wire->ip.protocol = IPPROTO_UDP;
+    wire->ip.addrs = path->addrs;
+    wire->ip.cksum = 0;
     wire->ip.cksum = ip_fast_csum(PTR(&wire->ip), 5);
+    wire->udp.seq = wire->tcp.seq;
+    wire->udp.size  = BE16(sizeof(wire->udp) + size);
+    wire->udp.cksum = 0;
+ // wire->tcp.src
+ // wire->tcp.dst
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
