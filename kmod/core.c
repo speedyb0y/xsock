@@ -141,7 +141,7 @@ typedef union xsock_wire_s {
         u16 ifrag;
         u16 ittlProtocol;
         u16 icksum;
-        u8  iaddrs[8];
+        u16 iaddrs[4];
         u32 uports;
         u16 usize;
         u16 ucksum;
