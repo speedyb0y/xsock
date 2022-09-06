@@ -92,7 +92,7 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 
 typedef union xsock_wire_s {
     struct {
-        u8 _align[10];
+        u16 _align[5];
         struct xsock_wire_eth_s {
             u8  dst[ETH_ALEN];
             u8  src[ETH_ALEN];
