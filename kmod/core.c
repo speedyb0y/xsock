@@ -116,16 +116,13 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
-#define WIRE_ETH(wire) PTR(&(wire)->eDst)
-#define WIRE_IP(wire)  PTR(&(wire)->ip.version)
-#define WIRE_UDP(wire) PTR(&(wire)->udp.src)
-
 typedef struct xsock_wire_s {
     u8 _align[10];
-#define ETH_HDR_SIZE 14
-    u8  eDst[ETH_ALEN];
-    u8  eSrc[ETH_ALEN];
-    u16 eType;
+    struct xsock_wire_eth_s {
+        u8  dst[ETH_ALEN];
+        u8  src[ETH_ALEN];
+        u16 type;
+    } eth;
 #define IP4_HDR_SIZE 20
     struct xsock_wire_ip_s {
         u8  version;
@@ -139,7 +136,6 @@ typedef struct xsock_wire_s {
         u8  src[4];
         u8  dst[4];
     } ip;
-#define TCP_HDR_SIZE 20
     union {
         struct xsock_wire_tcp_s { // AS ORIGINAL TCP
             u16 src;
@@ -337,7 +333,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = PTR(skb->data) + IP4_HDR_SIZE + TCP_HDR_SIZE - sizeof(xsock_wire_s);
+    xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->udp) - sizeof(xsock_wire_s);
 
     // IDENTIFY NODE AND PATH IDS FROM SERVER PORT
 #if XSOCK_SERVER
@@ -353,7 +349,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // VALIDATE NODE ID
     // VALIDATE PATH ID
     if ((PTR(wire) + sizeof(xsock_wire_s)) > SKB_TAIL(skb)
-     || wire->eType     != BE16(ETH_P_IP)
+     || wire->eth.type    != BE16(ETH_P_IP)
      || wire->ip.version  != 0x45
      || wire->ip.protocol != IPPROTO_UDP
 #if XSOCK_SERVER
@@ -372,7 +368,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint payloadSize = BE16(wire->ip.size) - IP4_HDR_SIZE - TCP_HDR_SIZE;
+    const uint payloadSize = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->udp);
 
     // DROP EMPTY/INCOMPLETE PAYLOADS
     if ((payloadSize == 0) || (payload + payloadSize) > SKB_TAIL(skb))
@@ -395,8 +391,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // NOTE: O SERVER NÃO PODE RECEBER ALEATORIAMENTE COM  UM MESMO IP EM MAIS DE UMA INTERACE, SENÃO VAI FICAR TROCANDO TODA HORA AQUI
     const u64 hash = (u64)(uintptr_t)itfc
-      + (*(u64*)wire->eDst) // VAI PEGAR UM PEDAÇO DO eSrc
-      + (*(u64*)wire->eSrc) // VAI PEGAR O eType
+      + (*(u64*)wire->eth.dst) // VAI PEGAR UM PEDAÇO DO eSrc
+      + (*(u64*)wire->eth.src) // VAI PEGAR O eType
       + (*(u64*)wire->ip.src) // VAI PEGAR O iDst
       + (       wire->udp.src)
     ;
@@ -407,9 +403,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         if (path->flags & XSOCK_PATH_F_ITFC_LEARN) // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
             path->itfc = itfc;
         if (path->flags & XSOCK_PATH_F_E_SRC_LEARN)
-            memcpy(path->eSrc, wire->eDst, ETH_ALEN);
+            memcpy(path->eSrc, wire->eth.dst, ETH_ALEN);
         if (path->flags & XSOCK_PATH_F_E_DST_LEARN)
-            memcpy(path->eDst, wire->eSrc, ETH_ALEN);
+            memcpy(path->eDst, wire->eth.src, ETH_ALEN);
         if (path->flags & XSOCK_PATH_F_I_SRC_LEARN)
             memcpy(path->saddr, wire->ip.dst, 4);
         if (path->flags & XSOCK_PATH_F_I_DST_LEARN)
@@ -476,7 +472,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = PTR(skb->data) + IP4_HDR_SIZE + TCP_HDR_SIZE - sizeof(xsock_wire_s);
+    xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->tcp) - sizeof(xsock_wire_s);
 
     const uint nid = 0; // TODO: FIXME:
 
@@ -497,7 +493,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint size = BE16(wire->ip.size) - IP4_HDR_SIZE - TCP_HDR_SIZE;
+    const uint size = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->tcp);
 
     // CHOOSE PATH
     xsock_path_s* const path = &node->paths[(
@@ -518,13 +514,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     // RE-ENCAPSULATE, ENCRYPT AND AUTHENTIFY
     wire->ip.hash = xsock_crypto_encode(payload, size);
-    wire->udp.size  = BE16(TCP_HDR_SIZE + size);
-    wire->ip.cksum = ip_fast_csum(WIRE_IP(wire), 5);
+    wire->udp.size  = BE16(sizeof(wire->udp) + size);
+    wire->ip.cksum = ip_fast_csum(PTR(&wire->ip), 5);
 
-    skb->data             = WIRE_ETH(wire);
-    skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
-    skb->network_header   = WIRE_IP(wire)  - PTR(skb->head);
-    skb->transport_header = WIRE_UDP(wire) - PTR(skb->head);
+    skb->data             = PTR(&wire->eth);
+    skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
+    skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
+    skb->transport_header = PTR(&wire->udp) - PTR(skb->head);
     skb->len              = ETH_HLEN + size;
     skb->mac_len          = ETH_HLEN;
     skb->protocol         = BE16(ETH_P_IP);
