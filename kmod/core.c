@@ -442,7 +442,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->tcp) - sizeof(xsock_wire_s);
 
-    const uint nid = 0; // TODO: FIXME:
+#if XSOCK_SERVER
+    const uint nid = wire->ip.dst[3];
+#else
+    const uint nid = wire->ip.src[3];
+#endif
 
 #if XSOCK_SERVER
     xsock_node_s* const node = &nodes[nid];
