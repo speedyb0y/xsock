@@ -60,42 +60,32 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 
 #define ARRAY_COUNT(a) (sizeof(a)/sizeof((a)[0]))
 
-#define XSOCK_PATHS_N XCONF_XSOCK_PATHS_N
-
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_SERVER_PORT XCONF_XSOCK_SERVER_PORT
+#define XSOCK_CONNS_N     XCONF_XSOCK_CONNS_N
+#define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
 
-#if XSOCK_SERVER
-#define XSOCK_NODES_N XCONF_XSOCK_NODES_N
-#else
-#define XSOCK_NODE_ID XCONF_XSOCK_NODE_ID
+#if ! (1 <= XSOCK_SERVER_PORT && XSOCK_SERVER_PORT <= 0xFFFF)
+#error "BAD XSOCK_SERVER_PORT"
+#endif
+
+#if ! (1 <= XSOCK_CONNS_N && XSOCK_CONNS_N <= 0xFFFF)
+#error "BAD XSOCK_CONNS_N"
 #endif
 
 #if ! (1 <= XSOCK_PATHS_N && XSOCK_PATHS_N <= 4)
 #error "BAD XSOCK_PATHS_N"
 #endif
 
-#if ! (1 <= XSOCK_SERVER_PORT && XSOCK_SERVER_PORT <= 0xFFFF)
-#error "BAD XSOCK_SERVER_PORT"
-#endif
-
-#if XSOCK_SERVER
-#if ! (1 <= XSOCK_NODES_N && XSOCK_NODES_N <= 0xFFFF)
-#error "BAD XSOCK_NODES_N"
-#endif
-#elif ! (0 <= XSOCK_NODE_ID && XSOCK_NODE_ID <= 0xFFFF)
-#error "BAD XSOCK_NODE_ID"
-#endif
-
 //
-#define PORT(nid, pid) (XSOCK_SERVER_PORT + (nid)*10 + (pid))
+#define PORT(cid, pid) (XSOCK_SERVER_PORT + (cid)*10 + (pid))
 // WILL UNSIGNED OVERFLOW IF LOWER
-#define PORT_NID(port) (((port) - XSOCK_SERVER_PORT) / 10)
+#define PORT_CID(port) (((port) - XSOCK_SERVER_PORT) / 10)
 #define PORT_PID(port) (((port) - XSOCK_SERVER_PORT) % 10)
 
 //
-#if XSOCK_SERVER && PORT(XSOCK_NODES_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
-#error "BAD XSOCK_SERVER_PORT / XSOCK_NODES_N / XSOCK_PATHS_N"
+#if XSOCK_SERVER && PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
+#error "BAD XSOCK_SERVER_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
 #endif
 
 #define XSOCK_PATH_F_UP                 0b0000000000000001U // ADMINISTRATIVELY
@@ -148,7 +138,7 @@ typedef struct xsock_wire_s {
         } tcp;
         struct xsock_wire_udp_s { // AS FAKE UDP
             u16 src;
-            u16 dst; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
+            u16 dst; // THE XSOCK_SERVER PORT WILL DETERMINE THE CONN AND PATH
             u16 size;
             u16 cksum;
             u32 ack;
@@ -170,9 +160,9 @@ typedef struct xsock_path_s {
     u64 reserved;
 #endif
     u16 flags;
-    u16 band;
+    u16 pkts;
     u16 sport;
-    u16 dport; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
+    u16 dport; // THE XSOCK_SERVER PORT WILL DETERMINE THE CONN AND PATH
     u8  saddr[4];
     u8  daddr[4];
     u8  mac[ETH_ALEN];
@@ -185,20 +175,14 @@ typedef struct xsock_path_s {
 } xsock_path_s;
 
 // EXPECTED SIZE
-#define XSOCK_NODE_SIZE ((2 + XSOCK_PATHS_N)*CACHE_LINE_SIZE)
+#define XSOCK_CONN_SIZE (CACHE_LINE_SIZE + XSOCK_PATHS_N*XSOCK_PATH_SIZE)
 
-#define XSOCK_FLOWS_N (2*CACHE_LINE_SIZE \
-    - sizeof(u32)*2 \
-    - sizeof(u16) \
-    )
-
-typedef struct xsock_node_s {
-    u32 flowPackets; // O QUE USAR COMO FLOW REMAINING
-    u32 flowRemaining; // QUANTOS PACOTES ENVIAR ATÉ AVANÇAR O FLOW SHIFT
-    u16 flowShift; // SHIFTA TODOS OS FLOW IDS AO MESMO TEMPO, AO SELECIONAR O PATH
-    u8  flows[XSOCK_FLOWS_N]; // MAPA FLOW ID -> PATH ID
+typedef struct xsock_conn_s {
+    u64 pid;
+    u64 remaining;
+    u64 _align[6];
     xsock_path_s paths[XSOCK_PATHS_N];
-} xsock_node_s;
+} xsock_conn_s;
 
 typedef struct xsock_cfg_path_s {
     char itfc[IFNAMSIZ];
@@ -206,59 +190,43 @@ typedef struct xsock_cfg_path_s {
     u8 gw[ETH_ALEN];
     u8 addr[4];
     u16 port;
-    uint band; // TOTAL DE PACOTES A CADA CIRCULADA
+    uint pkts; // TOTAL DE PACOTES A CADA CIRCULADA
 } xsock_cfg_path_s;
 
-typedef struct xsock_cfg_node_side_s {
-    uint pkts;
-    xsock_cfg_path_s paths[XSOCK_PATHS_N];
-} xsock_cfg_node_side_s;
-
-typedef struct xsock_cfg_node_s {
-    uint id;
-    xsock_cfg_node_side_s clt;
-    xsock_cfg_node_side_s srv;
-} xsock_cfg_node_s;
-
-#if XSOCK_SERVER
-#define NODE_ID(node) ((uint)((node) - nodes))
-static xsock_node_s nodes[XSOCK_NODES_N];
-#else
-#define NODE_ID(node) XSOCK_NODE_ID
-static xsock_node_s node[1];
-#endif
+typedef struct xsock_cfg_conn_s {
+    xsock_cfg_path_s clt[XSOCK_PATHS_N];
+    xsock_cfg_path_s srv[XSOCK_PATHS_N];
+} xsock_cfg_conn_s;
 
 static net_device_s* xdev;
+#define CONN_ID(conn) ((uint)((conn) - conns))
+static xsock_conn_s conns[XSOCK_CONNS_N];
 
-static const xsock_cfg_node_s cfgNodes[] = {
-#if (XSOCK_SERVER && XSOCK_NODES_N > 1) || XSOCK_NODE_ID == 1
-    { .id = 1,
-        .clt = { .pkts = XCONF_XSOCK_NODE_1_CLT_PKTS, .paths = {
-            { .itfc = XCONF_XSOCK_NODE_1_CLT_PATH_0_ITFC, .band = XCONF_XSOCK_NODE_1_CLT_PATH_0_BAND, .mac = XCONF_XSOCK_NODE_1_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_NODE_1_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_NODE_1_CLT_PATH_0_ADDR_0,XCONF_XSOCK_NODE_1_CLT_PATH_0_ADDR_1,XCONF_XSOCK_NODE_1_CLT_PATH_0_ADDR_2,XCONF_XSOCK_NODE_1_CLT_PATH_0_ADDR_3}, .port = XCONF_XSOCK_NODE_1_CLT_PATH_0_PORT, },
+static const xsock_cfg_conn_s cfg = {
+    .clt = {
+        { .pkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_0_PORT, },
 #if XSOCK_PATHS_N > 1
-            { .itfc = XCONF_XSOCK_NODE_1_CLT_PATH_1_ITFC, .band = XCONF_XSOCK_NODE_1_CLT_PATH_1_BAND, .mac = XCONF_XSOCK_NODE_1_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_NODE_1_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_NODE_1_CLT_PATH_1_ADDR_0,XCONF_XSOCK_NODE_1_CLT_PATH_1_ADDR_1,XCONF_XSOCK_NODE_1_CLT_PATH_1_ADDR_2,XCONF_XSOCK_NODE_1_CLT_PATH_1_ADDR_3}, .port = XCONF_XSOCK_NODE_1_CLT_PATH_1_PORT, },
+        { .pkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_1_PORT, },
 #if XSOCK_PATHS_N > 2
-            { .itfc = XCONF_XSOCK_NODE_1_CLT_PATH_2_ITFC, .band = XCONF_XSOCK_NODE_1_CLT_PATH_2_BAND, .mac = XCONF_XSOCK_NODE_1_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_NODE_1_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_NODE_1_CLT_PATH_2_ADDR_0,XCONF_XSOCK_NODE_1_CLT_PATH_2_ADDR_1,XCONF_XSOCK_NODE_1_CLT_PATH_2_ADDR_2,XCONF_XSOCK_NODE_1_CLT_PATH_2_ADDR_3}, .port = XCONF_XSOCK_NODE_1_CLT_PATH_2_PORT, },
+        { .pkts = XCONF_XSOCK_CLT_PATH_2_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_2_ITFC, .mac = XCONF_XSOCK_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_CLT_PATH_2_ADDR_0,XCONF_XSOCK_CLT_PATH_2_ADDR_1,XCONF_XSOCK_CLT_PATH_2_ADDR_2,XCONF_XSOCK_CLT_PATH_2_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_2_PORT, },
 #if XSOCK_PATHS_N > 3
-            { .itfc = XCONF_XSOCK_NODE_1_CLT_PATH_3_ITFC, .band = XCONF_XSOCK_NODE_1_CLT_PATH_3_BAND, .mac = XCONF_XSOCK_NODE_1_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_NODE_1_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_NODE_1_CLT_PATH_3_ADDR_0,XCONF_XSOCK_NODE_1_CLT_PATH_3_ADDR_1,XCONF_XSOCK_NODE_1_CLT_PATH_3_ADDR_2,XCONF_XSOCK_NODE_1_CLT_PATH_3_ADDR_3}, .port = XCONF_XSOCK_NODE_1_CLT_PATH_3_PORT, },
+        { .pkts = XCONF_XSOCK_CLT_PATH_3_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_3_ITFC, .mac = XCONF_XSOCK_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_CLT_PATH_3_ADDR_0,XCONF_XSOCK_CLT_PATH_3_ADDR_1,XCONF_XSOCK_CLT_PATH_3_ADDR_2,XCONF_XSOCK_CLT_PATH_3_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_3_PORT, },
 #endif
 #endif
 #endif
-        }},
-        .srv = { .pkts = XCONF_XSOCK_NODE_1_SRV_PKTS, .paths = {
-            { .itfc = XCONF_XSOCK_NODE_1_SRV_PATH_0_ITFC, .band = XCONF_XSOCK_NODE_1_SRV_PATH_0_BAND, .mac = XCONF_XSOCK_NODE_1_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_NODE_1_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_NODE_1_SRV_PATH_0_ADDR_0,XCONF_XSOCK_NODE_1_SRV_PATH_0_ADDR_1,XCONF_XSOCK_NODE_1_SRV_PATH_0_ADDR_2,XCONF_XSOCK_NODE_1_SRV_PATH_0_ADDR_3}, .port = PORT(1, 0), },
-#if XSOCK_PATHS_N > 1
-            { .itfc = XCONF_XSOCK_NODE_1_SRV_PATH_1_ITFC, .band = XCONF_XSOCK_NODE_1_SRV_PATH_1_BAND, .mac = XCONF_XSOCK_NODE_1_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_NODE_1_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_NODE_1_SRV_PATH_1_ADDR_0,XCONF_XSOCK_NODE_1_SRV_PATH_1_ADDR_1,XCONF_XSOCK_NODE_1_SRV_PATH_1_ADDR_2,XCONF_XSOCK_NODE_1_SRV_PATH_1_ADDR_3}, .port = PORT(1, 1), },
-#if XSOCK_PATHS_N > 2
-            { .itfc = XCONF_XSOCK_NODE_1_SRV_PATH_2_ITFC, .band = XCONF_XSOCK_NODE_1_SRV_PATH_2_BAND, .mac = XCONF_XSOCK_NODE_1_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_NODE_1_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_NODE_1_SRV_PATH_2_ADDR_0,XCONF_XSOCK_NODE_1_SRV_PATH_2_ADDR_1,XCONF_XSOCK_NODE_1_SRV_PATH_2_ADDR_2,XCONF_XSOCK_NODE_1_SRV_PATH_2_ADDR_3}, .port = PORT(1, 2), },
-#if XSOCK_PATHS_N > 3
-            { .itfc = XCONF_XSOCK_NODE_1_SRV_PATH_3_ITFC, .band = XCONF_XSOCK_NODE_1_SRV_PATH_3_BAND, .mac = XCONF_XSOCK_NODE_1_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_NODE_1_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_NODE_1_SRV_PATH_3_ADDR_0,XCONF_XSOCK_NODE_1_SRV_PATH_3_ADDR_1,XCONF_XSOCK_NODE_1_SRV_PATH_3_ADDR_2,XCONF_XSOCK_NODE_1_SRV_PATH_3_ADDR_3}, .port = PORT(1, 3), },
-#endif
-#endif
-#endif
-        }}
     },
+    .srv = {
+        { .pkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, .port = PORT(1, 0), },
+#if XSOCK_PATHS_N > 1
+        { .pkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, .port = PORT(1, 1), },
+#if XSOCK_PATHS_N > 2
+        { .pkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, .port = PORT(1, 2), },
+#if XSOCK_PATHS_N > 3
+        { .pkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, .port = PORT(1, 3), },
 #endif
+#endif
+#endif
+    }
 };
 
 static u16 xsock_crypto_encode (void* restrict data, uint size) {
@@ -277,48 +245,12 @@ static u16 xsock_crypto_decode (void* restrict data, uint size) {
     return size;
 }
 
-static void xsock_node_flows_update (xsock_node_s* const node) {
+static void xsock_conn_flows_update (xsock_conn_s* const conn) {
 
-    uint total = 0;
-    uint maiorB = 0;
-    uint maiorP = 0;
+    // TODO: FIXME:
 
-    foreach (pid, XSOCK_PATHS_N) {
-        const uint b = FLAGS_IS_UP(node->paths[pid].flags) * node->paths[pid].band;
-        // CALCULA O TOTAL
-        total += b;
-        // LEMBRA O PATH COM MAIOR BANDWIDTH
-        // LEMBRA O BANDWIDTH DELE
-        if (maiorB < b) {
-            maiorB = b;
-            maiorP = pid;
-        }
-    }
-
-    u8* flow = node->flows;
-    uint pid = maiorP;
-
-    if (total) {
-        do {
-            for (uint q = ((uintll)XSOCK_FLOWS_N * FLAGS_IS_UP(node->paths[pid].flags) * node->paths[pid].band) / total; q; q--)
-                *flow++ = pid;
-            pid = (pid + 1) % XSOCK_PATHS_N;
-        } while (flow != &node->flows[XSOCK_FLOWS_N] && pid != maiorP);
-    }
-
-    // O QUE SOBRAR DEIXA COM O MAIOR PATH
-    while (flow != &node->flows[XSOCK_FLOWS_N])
-          *flow++ = pid;
-
-    // PRINT IT
-    char flowsStr[XSOCK_FLOWS_N + 1];
-
-    foreach (fid, XSOCK_FLOWS_N)
-        flowsStr[fid] = '0' + node->flows[fid];
-    flowsStr[XSOCK_FLOWS_N] = '\0';
-
-    printk("XSOCK: NODE %u: FLOWS UPDATED: PACKETS %u REMAINING %u FLOWS %s\n",
-        NODE_ID(node), node->flowPackets, node->flowRemaining, flowsStr);
+    printk("XSOCK: CONN %u: FLOWS UPDATED: PID %llu REMAINING %llu\n",
+        CONN_ID(conn), (uintll)conn->pid, (uintll)conn->remaining);
 }
 
 static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
@@ -333,35 +265,29 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->udp) - sizeof(xsock_wire_s);
 
-    // IDENTIFY NODE AND PATH IDS FROM SERVER PORT
+    // IDENTIFY CONN AND PATH IDS FROM SERVER PORT
 #if XSOCK_SERVER
     const uint port = BE16(wire->udp.dst);
 #else
     const uint port = BE16(wire->udp.src);
 #endif
-    const uint nid = PORT_NID(port);
+    const uint cid = PORT_CID(port);
     const uint pid = PORT_PID(port);
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
-    // VALIDATE NODE ID
+    // VALIDATE CONN ID
     // VALIDATE PATH ID
     if ((PTR(wire) + sizeof(xsock_wire_s)) > SKB_TAIL(skb)
      || wire->eth.type    != BE16(ETH_P_IP)
      || wire->ip.version  != 0x45
      || wire->ip.protocol != IPPROTO_UDP
-#if XSOCK_SERVER
-     || nid >= XSOCK_NODES_N
-#else
-     || nid != XSOCK_NODE_ID
-#endif
+     || cid >= XSOCK_CONNS_N
      || pid >= XSOCK_PATHS_N
     )
         return RX_HANDLER_PASS;
 
-#if XSOCK_SERVER
-    xsock_node_s* const node = &nodes[nid];
-#endif
+    xsock_conn_s* const conn = &conns[cid];
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
@@ -376,12 +302,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (xsock_crypto_decode(payload, payloadSize) != wire->ip.hash)
         goto drop;
 
-    xsock_path_s* const path = &node->paths[pid];
+    xsock_path_s* const path = &conn->paths[pid];
 
     // DETECT AND UPDATE PATH AVAILABILITY
     if (unlikely(!(path->flags &  XSOCK_PATH_F_UP_AUTO))) {
                    path->flags |= XSOCK_PATH_F_UP_AUTO; // TODO: FIXME: IMPLEMENTAR E USAR ISSO
-        xsock_node_flows_update(node);
+        xsock_conn_flows_update(conn);
     }
 #if XSOCK_SERVER
     // DETECT AND UPDATE PATH CHANGES
@@ -411,10 +337,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         if (path->flags & XSOCK_PATH_F_DPORT_LEARN)
             path->dport = wire->udp.src;
 
-        printk("XSOCK: NODE %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
+        printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
-            nid, pid, (uintll)path->hash, path->itfc->name,
+            cid, pid, (uintll)path->hash, path->itfc->name,
             _MAC(path->mac), _IP4(path->saddr), BE16(path->sport),
             _MAC(path->gw),  _IP4(path->daddr), BE16(path->dport));
     }
@@ -446,43 +372,28 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         goto drop;
 
 #if XSOCK_SERVER
-    const uint nid = wire->ip.dst[3];
+    const uint cid = wire->ip.dst[3];
 #else
-    const uint nid = wire->ip.src[3];
+    const uint cid = wire->ip.src[3];
 #endif
+    if (cid >= XSOCK_CONNS_N)
+        goto drop;
 
-#if XSOCK_SERVER
-    xsock_node_s* const node = &nodes[nid];
-#endif
+    xsock_conn_s* const conn = &conns[cid];
 
+    // CHOOSE PATH
     // ENVIA flowPackets, E AÍ AVANCA flowShift
-    if (node->flowRemaining == 0) {
-        node->flowRemaining = node->flowPackets / XSOCK_FLOWS_N;
-        node->flowShift++;
-    } else
-        node->flowRemaining--;
+    if (conn->remaining == 0)
+        conn->remaining = conn->paths[(++(conn->pid)) % XSOCK_PATHS_N].pkts;
+    else
+        conn->remaining--;
+
+    xsock_path_s* const path = &conn->paths[conn->pid];
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
     const uint size = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->tcp);
-
-    // CHOOSE PATH
-    xsock_path_s* const path = &node->paths[(
-            (skb->mark >= 30000) &&
-            (skb->mark <  40000)
-                ? // PATH BY MARK
-                    skb->mark
-                : // PATH BY FLOW
-                    node->flows[( node->flowShift + (
-                        (skb->mark >= 40000) &&
-                        (skb->mark <  50000)
-                            ? // FLOW BY MARK
-                            skb->mark
-                            : // FLOW BY HASH
-                            (nid + wire->udp.src + wire->udp.dst)
-                    )) % XSOCK_FLOWS_N]
-        ) % XSOCK_PATHS_N];
 
     // RE-ENCAPSULATE, ENCRYPT AND AUTHENTIFY
     wire->ip.hash = xsock_crypto_encode(payload, size);
@@ -567,20 +478,20 @@ static void xsock_dev_setup (net_device_s* const dev) {
         ;
 }
 
-static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, xsock_path_s* const restrict path, const uint pid, const xsock_cfg_node_s* const restrict cfg) {
+static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, xsock_path_s* const restrict path, const uint pid, const xsock_cfg_conn_s* const restrict cfg) {
 
 #if XSOCK_SERVER
-    const xsock_cfg_path_s* const peer = &cfg->clt.paths[pid];
-    const xsock_cfg_path_s* const this = &cfg->srv.paths[pid];
+    const xsock_cfg_path_s* const peer = &cfg->clt[pid];
+    const xsock_cfg_path_s* const this = &cfg->srv[pid];
 #else
-    const xsock_cfg_path_s* const this = &cfg->clt.paths[pid];
-    const xsock_cfg_path_s* const peer = &cfg->srv.paths[pid];
+    const xsock_cfg_path_s* const this = &cfg->clt[pid];
+    const xsock_cfg_path_s* const peer = &cfg->srv[pid];
 #endif
 
-    printk("XSOCK: NODE %u: PATH %u: INITIALIZING WITH BAND %u ITFC %s"
+    printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH PKTS %u ITFC %s"
         " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
         " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
-        nid, pid, this->band, this->itfc,
+        cid, pid, this->pkts, this->itfc,
         _MAC(this->mac), _IP4(this->addr), this->port,
         _MAC(this->gw),  _IP4(peer->addr), peer->port
     );
@@ -603,7 +514,7 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
 #else
     path->reserved2  = 0;
 #endif
-    path->band       = this->band;
+    path->pkts       = this->pkts;
     path->sport      = BE16(this->port);
     path->dport      = BE16(peer->port);
 
@@ -639,37 +550,25 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
         if (path->itfc) { // TODO:
             path->flags |= XSOCK_PATH_F_UP_ITFC;
         } else { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
-            printk("XSOCK: NODE %u: PATH %u: INTERFACE NOT HOOKED\n", nid, pid);
+            printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT HOOKED\n", cid, pid);
             dev_put(itfc);
         }
     } else
-        printk("XSOCK: NODE %u: PATH %u: INTERFACE NOT FOUND\n", nid, pid);
+        printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT FOUND\n", cid, pid);
 }
 
-static void xsock_node_init (const xsock_cfg_node_s* const cfg) {
+static void xsock_conn_init (const xsock_cfg_conn_s* const cfg, xsock_conn_s* const conn, const uint cid) {
 
-    const uint nid = cfg->id;
-#if XSOCK_SERVER
-    xsock_node_s* const node = &nodes[nid];
-#endif
-#if XSOCK_SERVER
-    const xsock_cfg_node_side_s* const this = &cfg->srv;
-#else
-    const xsock_cfg_node_side_s* const this = &cfg->clt;
-#endif
+    printk("XSOCK: CONN %u: INITIALIZING\n", cid);
 
-    printk("XSOCK: NODE %u: INITIALIZING WITH PKTS %u\n",
-        nid, this->pkts);
-
-    node->flowPackets   = this->pkts;
-    node->flowRemaining = 0;
-    node->flowShift     = 0;
-
+    // INITIALIZE IT
+    conn->remaining = 0;
+    conn->pid       = 0;
     // INITIALIZE ITS PATHS
     foreach (pid, XSOCK_PATHS_N)
-        xsock_path_init(node, nid, &node->paths[pid], pid, cfg);
+        xsock_path_init(conn, cid, &conn->paths[pid], pid, cfg);
     // INITIALIZE ITS FLOWS
-    xsock_node_flows_update(node);
+    xsock_conn_flows_update(conn);
 }
 
 static int __init xsock_init(void) {
@@ -687,7 +586,7 @@ static int __init xsock_init(void) {
 
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
-    BUILD_BUG_ON(sizeof(xsock_node_s) != XSOCK_NODE_SIZE);
+    BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
 
     // CREATE THE VIRTUAL INTERFACE
     net_device_s* const dev = alloc_netdev(0, "xsock", NET_NAME_USER, xsock_dev_setup);
@@ -706,14 +605,11 @@ static int __init xsock_init(void) {
 
     xdev = dev;
 
-    // INITIALIZE NODE(S)
-#if XSOCK_SERVER
-    memset(nodes, 0, sizeof(nodes));
-#else
-    memset(node, 0, sizeof(node));
-#endif
-    foreach (i, ARRAY_COUNT(cfgNodes))
-        xsock_node_init(&cfgNodes[i]);
+    // INITIALIZE CONNS
+    memset(conns, 0, sizeof(conns));
+
+    foreach (cid, ARRAY_COUNT(conns))
+        xsock_conn_init(&cfg, &conns[cid], cid);
 
     return 0;
 }
