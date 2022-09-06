@@ -209,7 +209,7 @@ typedef struct xsock_cfg_path_s {
     uint band; // TOTAL DE PACOTES A CADA CIRCULADA
 } xsock_cfg_path_s;
 
-typedef struct xsock_cfg_node_srv_s {
+typedef struct xsock_cfg_node_side_s {
     uint pkts;
     xsock_cfg_path_s paths[XSOCK_PATHS_N];
 } xsock_cfg_node_side_s;
@@ -639,7 +639,7 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
 
     memcpy(path->saddr, this->addr, 4);
     memcpy(path->daddr, peer->addr, 4);
-
+                                   
     net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
     if (itfc) {
