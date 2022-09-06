@@ -103,11 +103,11 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #define XSOCK_PATH_F_UP_ITFC            0b0000000000000100U // WATCH INTERFACE EVENTS AND SET THIS TODO: INICIALIZAR COMO 0 E CARREGAR ISSO NO DEVICE NOTIFIER
 #if XSOCK_SERVER
 #define XSOCK_PATH_F_ITFC_LEARN         0b0000000000001000U
-#define XSOCK_PATH_F_E_SRC_LEARN        0b0000000000010000U
-#define XSOCK_PATH_F_E_DST_LEARN        0b0000000000100000U
-#define XSOCK_PATH_F_I_SRC_LEARN        0b0000000001000000U
-#define XSOCK_PATH_F_I_DST_LEARN        0b0000000010000000U    // TODO: TIME DO ULTIMO RECEBIDO; DESATIVAR O PATH NO SERVIDOR SE NAO RECEBER NADA EM TANTO TEMPO
-#define XSOCK_PATH_F_U_DST_LEARN        0b0000000100000000U
+#define XSOCK_PATH_F_MAC_LEARN        0b0000000000010000U
+#define XSOCK_PATH_F_GW_LEARN        0b0000000000100000U
+#define XSOCK_PATH_F_SADDR_LEARN        0b0000000001000000U
+#define XSOCK_PATH_F_DADDR_LEARN        0b0000000010000000U    // TODO: TIME DO ULTIMO RECEBIDO; DESATIVAR O PATH NO SERVIDOR SE NAO RECEBER NADA EM TANTO TEMPO
+#define XSOCK_PATH_F_DPORT_LEARN        0b0000000100000000U
 #endif
 
 #define FLAGS_IS_UP(f) (((f) & (XSOCK_PATH_F_UP | XSOCK_PATH_F_UP_AUTO | XSOCK_PATH_F_UP_ITFC)) \
@@ -175,8 +175,8 @@ typedef struct xsock_path_s {
     u16 dport; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
     u8  saddr[4];
     u8  daddr[4];
-    u8  eDst[ETH_ALEN];
-    u8  eSrc[ETH_ALEN];
+    u8  mac[ETH_ALEN];
+    u8  gw[ETH_ALEN];
     u16 eType;
     u8  iVersion;
     u8  iTOS;
@@ -184,15 +184,13 @@ typedef struct xsock_path_s {
     u64 reserved3;
 } xsock_path_s;
 
+// EXPECTED SIZE
+#define XSOCK_NODE_SIZE ((2 + XSOCK_PATHS_N)*CACHE_LINE_SIZE)
+
 #define XSOCK_FLOWS_N (2*CACHE_LINE_SIZE \
     - sizeof(u32)*2 \
     - sizeof(u16) \
     )
-
-// EXPECTED SIZE
-#define XSOCK_NODE_SIZE ((2 + XSOCK_PATHS_N)*CACHE_LINE_SIZE)
-
-static net_device_s* xdev;
 
 typedef struct xsock_node_s {
     u32 flowPackets; // O QUE USAR COMO FLOW REMAINING
@@ -229,6 +227,8 @@ static xsock_node_s nodes[XSOCK_NODES_N];
 #define NODE_ID(node) XSOCK_NODE_ID
 static xsock_node_s node[1];
 #endif
+
+static net_device_s* xdev;
 
 static const xsock_cfg_node_s cfgNodes[] = {
 #if (XSOCK_SERVER && XSOCK_NODES_N > 1) || XSOCK_NODE_ID == 1
@@ -401,23 +401,23 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
         if (path->flags & XSOCK_PATH_F_ITFC_LEARN) // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
             path->itfc = itfc;
-        if (path->flags & XSOCK_PATH_F_E_SRC_LEARN)
-            memcpy(path->eSrc, wire->eth.dst, ETH_ALEN);
-        if (path->flags & XSOCK_PATH_F_E_DST_LEARN)
-            memcpy(path->eDst, wire->eth.src, ETH_ALEN);
-        if (path->flags & XSOCK_PATH_F_I_SRC_LEARN)
+        if (path->flags & XSOCK_PATH_F_MAC_LEARN)
+            memcpy(path->mac, wire->eth.dst, ETH_ALEN);
+        if (path->flags & XSOCK_PATH_F_GW_LEARN)
+            memcpy(path->gw, wire->eth.src, ETH_ALEN);
+        if (path->flags & XSOCK_PATH_F_SADDR_LEARN)
             memcpy(path->saddr, wire->ip.dst, 4);
-        if (path->flags & XSOCK_PATH_F_I_DST_LEARN)
+        if (path->flags & XSOCK_PATH_F_DADDR_LEARN)
             memcpy(path->daddr, wire->ip.src, 4);
-        if (path->flags & XSOCK_PATH_F_U_DST_LEARN)
+        if (path->flags & XSOCK_PATH_F_DPORT_LEARN)
             path->dport = wire->udp.src;
 
         printk("XSOCK: NODE %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             nid, pid, (uintll)path->hash, path->itfc->name,
-            _MAC(path->eSrc), _IP4(path->saddr), BE16(path->sport),
-            _MAC(path->eDst), _IP4(path->daddr), BE16(path->dport));
+            _MAC(path->mac), _IP4(path->saddr), BE16(path->sport),
+            _MAC(path->gw),  _IP4(path->daddr), BE16(path->dport));
     }
 #endif
 
@@ -617,11 +617,11 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
         | (XSOCK_PATH_F_UP_AUTO     * !0)
 #if XSOCK_SERVER
         | (XSOCK_PATH_F_ITFC_LEARN  * !0)
-        | (XSOCK_PATH_F_E_SRC_LEARN * !0)
-        | (XSOCK_PATH_F_E_DST_LEARN * !0)
-        | (XSOCK_PATH_F_I_SRC_LEARN * !0)
-        | (XSOCK_PATH_F_I_DST_LEARN * !0)
-        | (XSOCK_PATH_F_U_DST_LEARN * !0)
+        | (XSOCK_PATH_F_MAC_LEARN   * !0)
+        | (XSOCK_PATH_F_GW_LEARN    * !0)
+        | (XSOCK_PATH_F_SADDR_LEARN * !0)
+        | (XSOCK_PATH_F_DADDR_LEARN * !0)
+        | (XSOCK_PATH_F_DPORT_LEARN * !0)
 #endif
         ;
     path->itfc       = NULL;
@@ -634,8 +634,8 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
     path->sport      = BE16(this->port);
     path->dport      = BE16(peer->port);
 
-    memcpy(path->eSrc, this->mac, ETH_ALEN);
-    memcpy(path->eDst, this->gw,  ETH_ALEN);
+    memcpy(path->mac, this->mac, ETH_ALEN);
+    memcpy(path->gw,  this->gw,  ETH_ALEN);
 
     memcpy(path->saddr, this->addr, 4);
     memcpy(path->daddr, peer->addr, 4);
