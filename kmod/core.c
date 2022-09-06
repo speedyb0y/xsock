@@ -607,7 +607,8 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
 #endif
 
     printk("XSOCK: NODE %u: PATH %u: INITIALIZING WITH BAND %u ITFC %s"
-        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u -> %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
+        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
+        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
         nid, pid, this->band, this->itfc,
         _MAC(this->mac), _IP4(this->addr), this->port,
         _MAC(this->gw),  _IP4(peer->addr), peer->port
