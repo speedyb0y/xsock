@@ -374,26 +374,29 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_conn_s* const conn = &conns[cid];
 
     // CHOOSE PATH
-    uint pid = conn->pid;
-    uint remaining = conn->remaining;
+    const xsock_path_s* path;
 
-    if (!remaining) {
+    if (conn->remaining) {
+        conn->remaining--;
+        path = &conn->paths[conn->pid];
+    } else {
         // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
+        uint remaining;
         uint c = XSOCK_PATHS_N;
+        uint pid = conn->pid;
         do {
-            pid = (pid + 1) % XSOCK_PATHS_N;
-            remaining = conn->paths[pid].pkts;
+            path = &conn->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
+            // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
+            // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
+            remaining = path->pkts * (FLAGS_IS_UP(path->flags) && path->itfc && path->itfc->flags & IFF_UP);
         } while (!remaining && --c);
         // DROP SE NÃO ACHOU NENHUM
         if (!remaining)
             goto drop;
+        // CONSUME ONE AND STORE THE CHANGES
+        conn->remaining = --remaining;
+        conn->pid = pid;
     }
-
-    // CONSUME ONE AND STORE THE CHANGES
-    conn->remaining = --remaining;
-    conn->pid = pid;
-
-    xsock_path_s* const path = &conn->paths[pid];
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
@@ -413,14 +416,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     skb->mac_len          = ETH_HLEN;
     skb->protocol         = BE16(ETH_P_IP);
     skb->ip_summed        = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
-
-    // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
-    // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
-    if (!(FLAGS_IS_UP(path->flags) && path->itfc && path->itfc->flags & IFF_UP))
-        goto drop;
-
-    // TODO: AO TROCAR TEM QUE DAR dev_put(skb->dev) ?
-    skb->dev = path->itfc;
+    skb->dev              = path->itfc;
 
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
