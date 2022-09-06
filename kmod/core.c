@@ -134,7 +134,7 @@ typedef union xsock_wire_s {
         };
     };
     struct {
-        u8 _align[10];
+        u16 _align[5];
         u16 eth[8];
         u16 isize;
         u16 ihash;
