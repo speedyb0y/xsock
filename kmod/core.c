@@ -388,13 +388,12 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         if (!remaining)
             goto drop;
     }
-    
-    remaining--;
 
-    conn->remaining = remaining;
+    // CONSUME ONE AND STORE THE CHANGES
+    conn->remaining = --remaining;
     conn->pid = pid;
-    
-    xsock_path_s* const path = &conn->paths[conn->pid];
+
+    xsock_path_s* const path = &conn->paths[pid];
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
