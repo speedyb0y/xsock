@@ -380,10 +380,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (!remaining) {
         // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
         uint c = XSOCK_PATHS_N;
-        while (!remaining && c--) {
+        do {
             pid = (pid + 1) % XSOCK_PATHS_N;
             remaining = conn->paths[pid].pkts;
-        }
+        } while (!remaining && --c);
         // DROP SE NÃO ACHOU NENHUM
         if (!remaining)
             goto drop;
