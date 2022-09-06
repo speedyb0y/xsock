@@ -393,8 +393,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         // DROP SE NÃO ACHOU NENHUM
         if (!remaining)
             goto drop;
-        // CONSUME ONE AND STORE THE CHANGES
-        conn->remaining = --remaining;
+        // STORE THE CHANGES
+        conn->remaining = remaining;
         conn->pid = pid;
     }
 
