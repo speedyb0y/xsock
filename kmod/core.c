@@ -77,7 +77,7 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #error "BAD XSOCK_PATHS_N"
 #endif
 
-//
+// THE XSOCK_SERVER PORT WILL DETERMINE THE CONN AND PATH
 #define PORT(cid, pid) (XSOCK_SERVER_PORT + (cid)*10 + (pid))
 #define PORT_CID(port) (((port) - XSOCK_SERVER_PORT) / 10)
 #define PORT_PID(port) (((port) - XSOCK_SERVER_PORT) % 10)
@@ -90,14 +90,6 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #define XSOCK_PATH_F_UP              0b0000000000000001U // ADMINISTRATIVELY
 #define XSOCK_PATH_F_UP_AUTO         0b0000000000000010U // SE DER TIMEOUT VAI DESATIVAR ISSO
 #define XSOCK_PATH_F_UP_ITFC         0b0000000000000100U // WATCH INTERFACE EVENTS AND SET THIS TODO: INICIALIZAR COMO 0 E CARREGAR ISSO NO DEVICE NOTIFIER
-#if XSOCK_SERVER
-#define XSOCK_PATH_F_ITFC_LEARN      0b0000000000001000U
-#define XSOCK_PATH_F_MAC_LEARN       0b0000000000010000U
-#define XSOCK_PATH_F_GW_LEARN        0b0000000000100000U
-#define XSOCK_PATH_F_SADDR_LEARN     0b0000000001000000U
-#define XSOCK_PATH_F_DADDR_LEARN     0b0000000010000000U    // TODO: TIME DO ULTIMO RECEBIDO; DESATIVAR O PATH NO SERVIDOR SE NAO RECEBER NADA EM TANTO TEMPO
-#define XSOCK_PATH_F_DPORT_LEARN     0b0000000100000000U
-#endif
 
 #define FLAGS_IS_UP(f) (((f) & (XSOCK_PATH_F_UP | XSOCK_PATH_F_UP_AUTO | XSOCK_PATH_F_UP_ITFC)) \
                             == (XSOCK_PATH_F_UP | XSOCK_PATH_F_UP_AUTO | XSOCK_PATH_F_UP_ITFC))
@@ -137,7 +129,7 @@ typedef struct xsock_wire_s {
         } tcp;
         struct xsock_wire_udp_s { // AS FAKE UDP
             u16 src;
-            u16 dst; // THE XSOCK_SERVER PORT WILL DETERMINE THE CONN AND PATH
+            u16 dst;
             u16 size;
             u16 cksum;
             u32 ack;
@@ -158,10 +150,8 @@ typedef struct xsock_path_s {
 #else
     u64 reserved;
 #endif
-    u16 flags;
-    u16 pkts;
-    u16 sport;
-    u16 dport; // THE XSOCK_SERVER PORT WILL DETERMINE THE CONN AND PATH
+    u32 flags;
+    u32 pkts;
     u8  saddr[4];
     u8  daddr[4];
     u8  mac[ETH_ALEN];
@@ -188,7 +178,6 @@ typedef struct xsock_cfg_path_s {
     u8 mac[ETH_ALEN];
     u8 gw[ETH_ALEN];
     u8 addr[4];
-    u16 port;
     uint pkts; // TOTAL DE PACOTES A CADA CIRCULADA
 } xsock_cfg_path_s;
 
@@ -203,25 +192,25 @@ static xsock_conn_s conns[XSOCK_CONNS_N];
 
 static const xsock_cfg_conn_s cfg = {
     .clt = {
-        { .pkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_0_PORT, },
+        { .pkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, },
 #if XSOCK_PATHS_N > 1
-        { .pkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_1_PORT, },
+        { .pkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, },
 #if XSOCK_PATHS_N > 2
-        { .pkts = XCONF_XSOCK_CLT_PATH_2_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_2_ITFC, .mac = XCONF_XSOCK_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_CLT_PATH_2_ADDR_0,XCONF_XSOCK_CLT_PATH_2_ADDR_1,XCONF_XSOCK_CLT_PATH_2_ADDR_2,XCONF_XSOCK_CLT_PATH_2_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_2_PORT, },
+        { .pkts = XCONF_XSOCK_CLT_PATH_2_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_2_ITFC, .mac = XCONF_XSOCK_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_CLT_PATH_2_ADDR_0,XCONF_XSOCK_CLT_PATH_2_ADDR_1,XCONF_XSOCK_CLT_PATH_2_ADDR_2,XCONF_XSOCK_CLT_PATH_2_ADDR_3}, },
 #if XSOCK_PATHS_N > 3
-        { .pkts = XCONF_XSOCK_CLT_PATH_3_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_3_ITFC, .mac = XCONF_XSOCK_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_CLT_PATH_3_ADDR_0,XCONF_XSOCK_CLT_PATH_3_ADDR_1,XCONF_XSOCK_CLT_PATH_3_ADDR_2,XCONF_XSOCK_CLT_PATH_3_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_3_PORT, },
+        { .pkts = XCONF_XSOCK_CLT_PATH_3_PKTS, .itfc = XCONF_XSOCK_CLT_PATH_3_ITFC, .mac = XCONF_XSOCK_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_CLT_PATH_3_ADDR_0,XCONF_XSOCK_CLT_PATH_3_ADDR_1,XCONF_XSOCK_CLT_PATH_3_ADDR_2,XCONF_XSOCK_CLT_PATH_3_ADDR_3}, },
 #endif
 #endif
 #endif
     },
     .srv = {
-        { .pkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, .port = PORT(1, 0), },
+        { .pkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, },
 #if XSOCK_PATHS_N > 1
-        { .pkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, .port = PORT(1, 1), },
+        { .pkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, },
 #if XSOCK_PATHS_N > 2
-        { .pkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, .port = PORT(1, 2), },
+        { .pkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, },
 #if XSOCK_PATHS_N > 3
-        { .pkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, .port = PORT(1, 3), },
+        { .pkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, },
 #endif
 #endif
 #endif
@@ -323,25 +312,19 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (unlikely(path->hash != hash)) {
                  path->hash =  hash;
 
-        if (path->flags & XSOCK_PATH_F_ITFC_LEARN) // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-            path->itfc = itfc;
-        if (path->flags & XSOCK_PATH_F_MAC_LEARN)
-            memcpy(path->mac, wire->eth.dst, ETH_ALEN);
-        if (path->flags & XSOCK_PATH_F_GW_LEARN)
-            memcpy(path->gw, wire->eth.src, ETH_ALEN);
-        if (path->flags & XSOCK_PATH_F_SADDR_LEARN)
-            memcpy(path->saddr, wire->ip.dst, 4);
-        if (path->flags & XSOCK_PATH_F_DADDR_LEARN)
-            memcpy(path->daddr, wire->ip.src, 4);
-        if (path->flags & XSOCK_PATH_F_DPORT_LEARN)
-            path->dport = wire->udp.src;
+        // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
+        path->itfc = itfc;
+        memcpy(path->mac, wire->eth.dst, ETH_ALEN);
+        memcpy(path->gw, wire->eth.src, ETH_ALEN);
+        memcpy(path->saddr, wire->ip.dst, 4);
+        memcpy(path->daddr, wire->ip.src, 4);
 
         printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
-            " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n"
-            " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
+            " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n"
+            " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
             cid, pid, (uintll)path->hash, path->itfc->name,
-            _MAC(path->mac), _IP4(path->saddr), BE16(path->sport),
-            _MAC(path->gw),  _IP4(path->daddr), BE16(path->dport));
+            _MAC(path->mac), _IP4(path->saddr),
+            _MAC(path->gw),  _IP4(path->daddr));
     }
 #endif
 
@@ -488,24 +471,16 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
 #endif
 
     printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH PKTS %u ITFC %s"
-        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
-        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
+        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
+        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
         cid, pid, this->pkts, this->itfc,
-        _MAC(this->mac), _IP4(this->addr), this->port,
-        _MAC(this->gw),  _IP4(peer->addr), peer->port
+        _MAC(this->mac), _IP4(this->addr),
+        _MAC(this->gw),  _IP4(peer->addr)
     );
 
     path->flags =
           (XSOCK_PATH_F_UP          * !0)
         | (XSOCK_PATH_F_UP_AUTO     * !0)
-#if XSOCK_SERVER
-        | (XSOCK_PATH_F_ITFC_LEARN  * !0)
-        | (XSOCK_PATH_F_MAC_LEARN   * !0)
-        | (XSOCK_PATH_F_GW_LEARN    * !0)
-        | (XSOCK_PATH_F_SADDR_LEARN * !0)
-        | (XSOCK_PATH_F_DADDR_LEARN * !0)
-        | (XSOCK_PATH_F_DPORT_LEARN * !0)
-#endif
         ;
     path->itfc       = NULL;
 #if XSOCK_SERVER
@@ -514,8 +489,6 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
     path->reserved2  = 0;
 #endif
     path->pkts       = this->pkts;
-    path->sport      = BE16(this->port);
-    path->dport      = BE16(peer->port);
 
     memcpy(path->mac, this->mac, ETH_ALEN);
     memcpy(path->gw,  this->gw,  ETH_ALEN);
