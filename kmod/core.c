@@ -117,8 +117,8 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
 #define WIRE_ETH(wire) PTR(&(wire)->eDst)
-#define WIRE_IP(wire)  PTR(&(wire)->iVersion)
-#define WIRE_UDP(wire) PTR(&(wire)->uSrc)
+#define WIRE_IP(wire)  PTR(&(wire)->ip.version)
+#define WIRE_UDP(wire) PTR(&(wire)->udp.src)
 
 typedef struct xsock_wire_s {
     u8 _align[10];
@@ -127,38 +127,40 @@ typedef struct xsock_wire_s {
     u8  eSrc[ETH_ALEN];
     u16 eType;
 #define IP4_HDR_SIZE 20
-    u8  iVersion;
-    u8  iTOS;
-    u16 iSize;
-    u16 iHash; // A CHECKSUM TO CONFIRM THE AUTHENTICITY OF THE PACKET
-    u16 iFrag;
-    u8  iTTL;
-    u8  iProtocol;
-    u16 iCksum;
-    u8  iSrc[4];
-    u8  iDst[4];
+    struct xsock_wire_ip_s {
+        u8  version;
+        u8  tos;
+        u16 size;
+        u16 hash; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
+        u16 frag;
+        u8  ttl;
+        u8  protocol;
+        u16 cksum;
+        u8  src[4];
+        u8  dst[4];
+    } ip;
 #define TCP_HDR_SIZE 20
     union {
-        struct { // AS ORIGINAL TCP
-            u16 tSrc;
-            u16 tDst;
-            u32 tSeq;
-            u32 tAck;
-            u16 tFlags;
-            u16 tWindow;
-            u16 tChecksum;
-            u16 tUrgent;
-        };
-        struct { // AS FAKE UDP
-            u16 uSrc;
-            u16 uDst; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
-            u16 uSize;
-            u16 uCksum;
-            u32 uAck;
-            u16 uFlags;
-            u16 uWindow;
-            u32 uSeq;
-        };
+        struct xsock_wire_tcp_s { // AS ORIGINAL TCP
+            u16 src;
+            u16 dst;
+            u32 seq;
+            u32 ack;
+            u16 flags;
+            u16 window;
+            u16 checksum;
+            u16 urgent;
+        } tcp;
+        struct xsock_wire_udp_s { // AS FAKE UDP
+            u16 src;
+            u16 dst; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
+            u16 size;
+            u16 cksum;
+            u32 ack;
+            u16 flags;
+            u16 window;
+            u32 seq;
+        } udp;
     };
 } xsock_wire_s;
 
@@ -174,14 +176,15 @@ typedef struct xsock_path_s {
 #endif
     u16 flags;
     u16 band;
-    u16 uSrc;
-    u16 uDst; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
-    u8  iSrc[4];
-    u8  iDst[4];
+    u16 sport;
+    u16 dport; // THE XSOCK_SERVER PORT WILL DETERMINE THE NODE AND PATH
+    u8  saddr[4];
+    u8  daddr[4];
     u8  eDst[ETH_ALEN];
     u8  eSrc[ETH_ALEN];
     u16 eType;
-    u16 reserved4;
+    u8  iVersion;
+    u8  iTOS;
     u64 reserved2;
     u64 reserved3;
 } xsock_path_s;
@@ -338,9 +341,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // IDENTIFY NODE AND PATH IDS FROM SERVER PORT
 #if XSOCK_SERVER
-    const uint port = BE16(wire->uDst);
+    const uint port = BE16(wire->udp.dst);
 #else
-    const uint port = BE16(wire->uSrc);
+    const uint port = BE16(wire->udp.src);
 #endif
     const uint nid = PORT_NID(port);
     const uint pid = PORT_PID(port);
@@ -351,8 +354,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // VALIDATE PATH ID
     if ((PTR(wire) + sizeof(xsock_wire_s)) > SKB_TAIL(skb)
      || wire->eType     != BE16(ETH_P_IP)
-     || wire->iVersion  != 0x45
-     || wire->iProtocol != IPPROTO_UDP
+     || wire->ip.version  != 0x45
+     || wire->ip.protocol != IPPROTO_UDP
 #if XSOCK_SERVER
      || nid >= XSOCK_NODES_N
 #else
@@ -369,14 +372,14 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint payloadSize = BE16(wire->iSize) - IP4_HDR_SIZE - TCP_HDR_SIZE;
+    const uint payloadSize = BE16(wire->ip.size) - IP4_HDR_SIZE - TCP_HDR_SIZE;
 
     // DROP EMPTY/INCOMPLETE PAYLOADS
     if ((payloadSize == 0) || (payload + payloadSize) > SKB_TAIL(skb))
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_crypto_decode(payload, payloadSize) != wire->iHash)
+    if (xsock_crypto_decode(payload, payloadSize) != wire->ip.hash)
         goto drop;
 
     xsock_path_s* const path = &node->paths[pid];
@@ -394,8 +397,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const u64 hash = (u64)(uintptr_t)itfc
       + (*(u64*)wire->eDst) // VAI PEGAR UM PEDAÇO DO eSrc
       + (*(u64*)wire->eSrc) // VAI PEGAR O eType
-      + (*(u64*)wire->iSrc) // VAI PEGAR O iDst
-      + (       wire->uSrc)
+      + (*(u64*)wire->ip.src) // VAI PEGAR O iDst
+      + (       wire->udp.src)
     ;
 
     if (unlikely(path->hash != hash)) {
@@ -408,18 +411,18 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         if (path->flags & XSOCK_PATH_F_E_DST_LEARN)
             memcpy(path->eDst, wire->eSrc, ETH_ALEN);
         if (path->flags & XSOCK_PATH_F_I_SRC_LEARN)
-            memcpy(path->iSrc, wire->iDst, 4);
+            memcpy(path->saddr, wire->ip.dst, 4);
         if (path->flags & XSOCK_PATH_F_I_DST_LEARN)
-            memcpy(path->iDst, wire->iSrc, 4);
+            memcpy(path->daddr, wire->ip.src, 4);
         if (path->flags & XSOCK_PATH_F_U_DST_LEARN)
-            path->uDst = wire->uSrc;
+            path->dport = wire->udp.src;
 
         printk("XSOCK: NODE %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             nid, pid, (uintll)path->hash, path->itfc->name,
-            _MAC(path->eSrc), _IP4(path->iSrc), BE16(path->uSrc),
-            _MAC(path->eDst), _IP4(path->iDst), BE16(path->uDst));
+            _MAC(path->eSrc), _IP4(path->saddr), BE16(path->sport),
+            _MAC(path->eDst), _IP4(path->daddr), BE16(path->dport));
     }
 #endif
 
@@ -494,7 +497,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint size = BE16(wire->iSize) - IP4_HDR_SIZE - TCP_HDR_SIZE;
+    const uint size = BE16(wire->ip.size) - IP4_HDR_SIZE - TCP_HDR_SIZE;
 
     // CHOOSE PATH
     xsock_path_s* const path = &node->paths[(
@@ -509,14 +512,14 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
                             ? // FLOW BY MARK
                             skb->mark
                             : // FLOW BY HASH
-                            (nid + wire->uSrc + wire->uDst)
+                            (nid + wire->udp.src + wire->udp.dst)
                     )) % XSOCK_FLOWS_N]
         ) % XSOCK_PATHS_N];
 
     // RE-ENCAPSULATE, ENCRYPT AND AUTHENTIFY
-    wire->iHash = xsock_crypto_encode(payload, size);
-    wire->uSize  = BE16(TCP_HDR_SIZE + size);
-    wire->iCksum = ip_fast_csum(WIRE_IP(wire), 5);
+    wire->ip.hash = xsock_crypto_encode(payload, size);
+    wire->udp.size  = BE16(TCP_HDR_SIZE + size);
+    wire->ip.cksum = ip_fast_csum(WIRE_IP(wire), 5);
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
@@ -633,14 +636,14 @@ static void xsock_path_init (xsock_node_s* const restrict node, const uint nid, 
     path->reserved2  = 0;
 #endif
     path->band       = this->band;
-    path->uSrc       = BE16(this->port);
-    path->uDst       = BE16(peer->port);
+    path->sport      = BE16(this->port);
+    path->dport      = BE16(peer->port);
 
     memcpy(path->eSrc, this->mac, ETH_ALEN);
     memcpy(path->eDst, this->gw,  ETH_ALEN);
 
-    memcpy(path->iSrc, this->addr, 4);
-    memcpy(path->iDst, peer->addr, 4);
+    memcpy(path->saddr, this->addr, 4);
+    memcpy(path->daddr, peer->addr, 4);
 
     net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
@@ -762,6 +765,9 @@ MODULE_VERSION("0.1");
 
 
 /*
+TODO: RETIRAR TAIS PORTAS DOS EPHEMERAL PORTS
+
+
 TODO: CORRIGIR O XGW
 no in
 if (skb->len <= XSOCK_PATH_SIZE_WIRE
