@@ -381,13 +381,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         path = &conn->paths[conn->pid];
     } else {
         // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
+        // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
+        // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
         uint remaining;
         uint c = XSOCK_PATHS_N;
         uint pid = conn->pid;
-        do {
-            path = &conn->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
-            // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
-            // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
+        do { pid = (pid + 1) % XSOCK_PATHS_N;
+            path = &conn->paths[pid];
             remaining = path->pkts * (FLAGS_IS_UP(path->flags) && path->itfc && path->itfc->flags & IFF_UP);
         } while (!remaining && --c);
         // DROP SE NÃO ACHOU NENHUM
