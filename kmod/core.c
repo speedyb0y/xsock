@@ -310,10 +310,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     ;
 
     if (unlikely(path->hash != hash)) {
-                 path->hash =  hash;
-
-        // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-        path->itfc = itfc;
+                 path->hash =  hash;        
+                 path->itfc = itfc; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
         memcpy(path->mac, wire->eth.dst, ETH_ALEN);
         memcpy(path->gw, wire->eth.src, ETH_ALEN);
         memcpy(path->saddr, wire->ip.dst, 4);
