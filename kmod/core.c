@@ -605,8 +605,6 @@ static int __init xsock_init(void) {
     xdev = dev;
 
     // INITIALIZE CONNS
-    memset(conns, 0, sizeof(conns));
-
     foreach (cid, ARRAY_COUNT(conns))
         xsock_conn_init(&cfg, &conns[cid], cid);
 
