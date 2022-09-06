@@ -261,8 +261,8 @@ static void xsock_conn_flows_update (xsock_conn_s* const conn) {
 
     // TODO: FIXME: SE O conn->pid ATUAL NAO ESTIVER DISPONIVEL, COLCOAR OUTRO
 
-    printk("XSOCK: CONN %u: FLOWS UPDATED: PID %llu REMAINING %llu\n",
-        CONN_ID(conn), (uintll)conn->pid, (uintll)conn->remaining);
+    printk("XSOCK: CONN %u: FLOWS UPDATED: PID %llu PATHS ON 0x%016llX\n",
+        CONN_ID(conn), (uintll)conn->pid, (uintll)conn->pathsOn);
 }
 
 static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
