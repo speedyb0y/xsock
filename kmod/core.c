@@ -501,8 +501,8 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
 
     path->flags     =  0;
     path->isUp      = !0;
-    path->isUpAuto  = !0;
-    path->isUpItfc  = !0;
+    path->isUpAuto  = true;
+    path->isUpItfc  = false;
     path->itfc      =  NULL;
 #if XSOCK_SERVER
     path->hash      = 0;
