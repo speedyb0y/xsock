@@ -145,10 +145,10 @@ typedef union xsock_wire_s {
         u32 uports;
         u16 usize;
         u16 ucksum;
-        u32 ack;
-        u32 flagsWindow;
+        u32 uack;
+        u32 uflagsWindow;
         u32 useq;
-    } fast;
+    } out;
 } xsock_wire_s;
 
 // EXPECTED SIZE
@@ -433,18 +433,20 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     const uint size = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->tcp);
 
     // ENCRYPT AND AUTHENTIFY
+    const uint hash = xsock_crypto_encode(payload, size);
+
     // RE-ENCAPSULATE
     //wire->fast.eth[6] = path->eth[6]; // BE16(ETH_P_IP); TODO:
     //wire->fast.eth[7] = path->eth[7]; // 0x45 0x00 TODO:
-    memcpy(wire->fast.eth,    path->eth, 16);
-    memcpy(wire->fast.iaddrs, path->iaddrs, 8);
-           wire->fast.ihash        = xsock_crypto_encode(payload, size);
-           wire->fast.ittlProtocol = 0x1111U; // IPPROTO_UDP
-           wire->fast.icksum       = 0;
-           wire->fast.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
-           wire->fast.useq         = wire->tcp.seq;
-           wire->fast.usize        = BE16(sizeof(wire->udp) + size);
-           wire->fast.ucksum       = 0;
+    memcpy(wire->out.eth,    path->eth, 16);
+    memcpy(wire->out.iaddrs, path->iaddrs, 8);
+           wire->out.ihash        = hash;
+           wire->out.ittlProtocol = 0x1111U; // IPPROTO_UDP
+           wire->out.icksum       = 0;
+           wire->out.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
+           wire->out.useq         = wire->tcp.seq;
+           wire->out.usize        = BE16(sizeof(wire->udp) + size);
+           wire->out.ucksum       = 0;
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
