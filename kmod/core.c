@@ -409,7 +409,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     memcpy(wire->eth.dst, path->gw,  ETH_ALEN);
     memcpy(wire->ip.src,  path->saddr, 4);
     memcpy(wire->ip.dst,  path->daddr, 4);
-    wire->eth.type = 0;
+    wire->eth.type = BE16(ETH_P_IP);
     wire->ip.hash = xsock_crypto_encode(payload, size);
     wire->ip.protocol = IPPROTO_UDP;
     wire->ip.cksum = 0;
