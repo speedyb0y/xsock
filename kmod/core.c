@@ -401,22 +401,22 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
     // TODO: FIXME: CONSOLIDAR TODOS ESSES CHECKS EM UMA COISA SO TODA VEZ QUE ALTERAR ALGUM DELES
     const u64 now = jiffies;
-    uint pid;
-    const xsock_path_s* path = &conn->paths[(pid = conn->pid)];
-    uint isOk = (conn->last + (HZ/2)) < now;
-    uint c = XSOCK_PATHS_N;    
-    while (!isOk && c--)
+
+    const uint pid = conn->pid + ((conn->last + (HZ/2)) < now);
+    
                 //path->isUp &&
             //path->isUpAuto &&
             //path->isUpItfc &&
             //path->itfc
         isOk = (path = &conn->paths[(pid = (pid + 1) % XSOCK_PATHS_N)])->isOk;
     // DROP SE NÃO ACHOU NENHUM
-    if (!isOk)
+    if (pid >= XSOCK_PATHS_N)
         goto drop;
     // STORE THE CHANGES
     conn->pid = pid;
     conn->last = now;
+    
+    const xsock_path_s* const path = &conn->paths[pid];
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
@@ -447,8 +447,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     skb->mac_len          = ETH_HLEN;
     skb->protocol         = BE16(ETH_P_IP);
     skb->ip_summed        = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
+    skb->dev              = path->itfc;
 
-    if ((skb->dev = path->itfc)->flags & IFF_UP) {
+    if (skb->dev->flags & IFF_UP) {
         // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
         // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
         // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
