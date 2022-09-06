@@ -608,8 +608,9 @@ static void xsock_conn_init (const xsock_cfg_conn_s* const cfg, xsock_conn_s* co
     printk("XSOCK: CONN %u: INITIALIZING\n", cid);
 
     // INITIALIZE IT
-    conn->remaining = 0;
-    conn->pid       = 0;
+    conn->pid     = 0;
+    conn->last    = 0;
+    conn->pathsOn = 0;
     // INITIALIZE ITS PATHS
     foreach (pid, XSOCK_PATHS_N)
         xsock_path_init(conn, cid, &conn->paths[pid], pid, cfg);
