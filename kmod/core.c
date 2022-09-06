@@ -379,7 +379,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     xsock_path_s* const path = &node->paths[pid];
 
     // DETECT AND UPDATE PATH AVAILABILITY
-    if (unlikely(!(path->flags & XSOCK_PATH_F_UP_AUTO))) {
+    if (unlikely(!(path->flags &  XSOCK_PATH_F_UP_AUTO))) {
                    path->flags |= XSOCK_PATH_F_UP_AUTO; // TODO: FIXME: IMPLEMENTAR E USAR ISSO
         xsock_node_flows_update(node);
     }
