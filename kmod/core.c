@@ -374,21 +374,21 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_conn_s* const conn = &conns[cid];
 
     // CHOOSE PATH
-    // ENVIA flowPackets, E AÍ AVANCA flowShift
-    uint c = XSOCK_PATHS_N;
     uint pid = conn->pid;
     uint remaining = conn->remaining;
-    
-    // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
-    while (!remaining && c--) {
-        pid = (pid + 1) % XSOCK_PATHS_N;
-        remaining = conn->paths[pid].pkts;
+
+    if (!remaining) {
+        // TENTA TODOS, E DEPOIS TENTA REPETIR O ATUAL
+        uint c = XSOCK_PATHS_N;
+        while (!remaining && c--) {
+            pid = (pid + 1) % XSOCK_PATHS_N;
+            remaining = conn->paths[pid].pkts;
+        }
+        // DROP SE NÃO ACHOU NENHUM
+        if (!remaining)
+            goto drop;
     }
-
-    // DROP SE NÃO ACHOU NENHUM
-    if (!remaining)
-        goto drop;
-
+    
     remaining--;
 
     conn->remaining = remaining;
