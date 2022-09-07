@@ -393,7 +393,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->mac_header       = PTR(&wire->ip)  - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
     skb->len       = sizeof(wire->ip) + sizeof(wire->tcp) + size;
-    skb->ip_summed = CHECKSUM_UNNECESSARY ; //CHECKSUM_UNNECESSARY;
+    skb->ip_summed = CHECKSUM_NONE; //CHECKSUM_UNNECESSARY;
     skb->mac_len   = 0;
     skb->dev       = xdev;
 
