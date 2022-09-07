@@ -58,10 +58,11 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #define _MAC(x) __A6(x)
 #define _IP4(x) __A4(x)
 
-#define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
-#define XSOCK_SERVER_PORT XCONF_XSOCK_SERVER_PORT
-#define XSOCK_CONNS_N     XCONF_XSOCK_CONNS_N
-#define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
+#define XSOCK_SERVER       XCONF_XSOCK_SERVER_IS
+#define XSOCK_SERVER_PORT  XCONF_XSOCK_SERVER_PORT
+#define XSOCK_CONNS_N      XCONF_XSOCK_CONNS_N
+#define XSOCK_PATHS_N      XCONF_XSOCK_PATHS_N
+#define XSOCK_SERVICE_PORT XCONF_XSOCK_SERVICE_PORT
 
 #if ! (1 <= XSOCK_SERVER_PORT && XSOCK_SERVER_PORT <= 0xFFFF)
 #error "BAD XSOCK_SERVER_PORT"
@@ -84,8 +85,6 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #if PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
 #error "BAD XSOCK_SERVER_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
 #endif
-
-#define SERVICE_PORT 7500
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
@@ -378,13 +377,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.cksum    = 0;
-    wire->tcp.dst     = BE16(SERVICE_PORT + cid);
+    wire->tcp.dst     = BE16(XSOCK_SERVICE_PORT + cid);
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
     wire->tcp.cksum   = 0;
 
-    // TODO: FIXME: IGNORE IP CHECKSUM
-    // TODO: FIXME: IGNORE TCP CHECKSUM
     // TODO: FIXME: SKB TRIM
     skb->csum_valid = 1;
     skb->data             = PTR(&wire->ip);
@@ -421,9 +418,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         goto drop;
 
 #if XSOCK_SERVER
-    const uint cid = BE16(wire->tcp.src) - SERVICE_PORT;
+    const uint cid = BE16(wire->tcp.src) - XSOCK_SERVICE_PORT;
 #else
-    const uint cid = BE16(wire->tcp.dst) - SERVICE_PORT;
+    const uint cid = BE16(wire->tcp.dst) - XSOCK_SERVICE_PORT;
 #endif
     if (cid >= XSOCK_CONNS_N)
         goto drop;
