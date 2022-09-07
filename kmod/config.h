@@ -6,8 +6,6 @@
 #define XCONF_XSOCK_CONNS_N 1024
 #define XCONF_XSOCK_PATHS_N 3
 
-#define XCONF_XSOCK_SERVICE_PORT 7500
-
 #define VPS_A 45
 #define VPS_B 77
 #define VPS_C 206

@@ -62,7 +62,6 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #define XSOCK_SERVER_PORT  XCONF_XSOCK_SERVER_PORT
 #define XSOCK_CONNS_N      XCONF_XSOCK_CONNS_N
 #define XSOCK_PATHS_N      XCONF_XSOCK_PATHS_N
-#define XSOCK_SERVICE_PORT XCONF_XSOCK_SERVICE_PORT
 
 #if ! (1 <= XSOCK_SERVER_PORT && XSOCK_SERVER_PORT <= 0xFFFF)
 #error "BAD XSOCK_SERVER_PORT"
@@ -76,12 +75,11 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #error "BAD XSOCK_PATHS_N"
 #endif
 
-// THE XSOCK_SERVER PORT WILL DETERMINE THE CONN AND PATH
+// THE ON-WIRE SERVER PORT WILL DETERMINE THE CONN AND PATH
 #define PORT(cid, pid) (XSOCK_SERVER_PORT + (cid)*10 + (pid))
 #define PORT_CID(port) (((port) - XSOCK_SERVER_PORT) / 10)
 #define PORT_PID(port) (((port) - XSOCK_SERVER_PORT) % 10)
 
-//
 #if PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
 #error "BAD XSOCK_SERVER_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
 #endif
@@ -377,7 +375,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.cksum    = 0;
-    wire->tcp.dst     = BE16(XSOCK_SERVICE_PORT + cid);
+#if XSOCK_SERVER
+    wire->tcp.dst     = BE16(XSOCK_SERVER_PORT + cid);
+#else
+    wire->tcp.src     = BE16(XSOCK_SERVER_PORT + cid);
+#endif
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
     wire->tcp.cksum   = 0;
@@ -418,9 +420,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         goto drop;
 
 #if XSOCK_SERVER
-    const uint cid = BE16(wire->tcp.src) - XSOCK_SERVICE_PORT;
+    const uint cid = BE16(wire->tcp.src) - XSOCK_SERVER_PORT;
 #else
-    const uint cid = BE16(wire->tcp.dst) - XSOCK_SERVICE_PORT;
+    const uint cid = BE16(wire->tcp.dst) - XSOCK_SERVER_PORT;
 #endif
     if (cid >= XSOCK_CONNS_N)
         goto drop;
@@ -480,6 +482,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     // RE-ENCAPSULATE
            wire->out.useq         = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+#if XSOCK_SERVER
+           wire->out.usrc         = BE16(PORT(cid, PID(conn)));
+#else
+           wire->out.udst         = BE16(PORT(cid, PID(conn)));
+#endif
            wire->out.usize        = BE16(sizeof(wire->udp) + size);
            wire->out.ucksum       = 0;
     memcpy(wire->out.eth,    &path->eth, sizeof(path->eth));
@@ -513,10 +520,15 @@ drop:
 
 static int xsock_dev_up (net_device_s* const dev) {
 
+    //dev->flags |= IFF_UP;
+
     return 0;
 }
 
 static int xsock_dev_down (net_device_s* const dev) {
+
+    //if (dev->flags & IFF_UP)
+        //dev->flags ^= IFF_UP;
 
     return 0;
 }
@@ -601,7 +613,8 @@ static int __init xsock_init (void) {
 
         xsock_conn_s* const conn = &conns[cid];
 
-        printk("XSOCK: CONN %u: INITIALIZING\n", cid);
+        if (cid == 0)
+            printk("XSOCK: CONN %u: INITIALIZING\n", cid);
 
         // INITIALIZE IT
         conn->path    = &conn->paths[0];
@@ -623,13 +636,13 @@ static int __init xsock_init (void) {
 #endif
 
             if (cid == 0)
-            printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj TIME %us PKTS %u IN TIMEOUT %us ITFC %s"
-                " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
-                " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
-                cid, pid, this->oBurst, this->oPkts, this->oTime, this->iTimeout, this->itfc,
-                _MAC(this->mac), _IP4(this->addr),
-                _MAC(this->gw),  _IP4(peer->addr)
-            );
+                printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj TIME %us PKTS %u IN TIMEOUT %us ITFC %s"
+                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
+                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
+                    cid, pid, this->oBurst, this->oPkts, this->oTime, this->iTimeout, this->itfc,
+                    _MAC(this->mac), _IP4(this->addr),
+                    _MAC(this->gw),  _IP4(peer->addr)
+                );
 
             memcpy(path->eth.mac,  this->mac, ETH_ALEN);
             memcpy(path->eth.gw,   this->gw,  ETH_ALEN);
@@ -662,6 +675,7 @@ static int __init xsock_init (void) {
                 // HOOK INTERFACE
                 if (rcu_dereference(itfc->rx_handler) != xsock_in) {
                     // NOT HOOKED YET
+                    printk("XSOCK: INTERFACE %s: HOOKING\n", itfc->name);
                     if (!netdev_rx_handler_register(itfc, xsock_in, NULL)) {
                         // HOOK SUCCESS
                         // NOTE: ISSO É PARA QUE POSSA DAR FORWARD NOS PACOTES
@@ -707,6 +721,7 @@ static void __exit xsock_exit (void) {
             if (itfc) {
                 rtnl_lock();
                 if (rcu_dereference(itfc->rx_handler) == xsock_in) {
+                    printk("XSOCK: INTERFACE %s: UNHOOKING\n", itfc->name);
                     netdev_rx_handler_unregister(itfc);
                     itfc->hard_header_len -= sizeof(xsock_path_s) - ETH_HLEN;
                     itfc->min_header_len  -= sizeof(xsock_path_s) - ETH_HLEN;

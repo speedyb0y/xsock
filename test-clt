@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. test-config
+TABLE_XSOCK=5
 
 (cd kmod && make && insmod clt.ko)
 
@@ -8,39 +8,37 @@ echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
 echo  300 > /proc/sys/net/ipv4/tcp_reordering
 
-ip link set dev enp5s0 up
-ip link set dev enp6s0 up
+
+###
+for ITFC in eth0 enp1s0 enp6s0 enp5s0 ; do
+    ethtool --offload ${ITFC} rx off
+    ethtool --offload ${ITFC} tx off
+    ethtool --offload ${ITFC} tx-checksum-ip-generic off
+    ethtool --offload ${ITFC} tx-checksum-ipv4 off
+    ethtool --offload ${ITFC} tx-checksum-ipv6 off
+    ethtool --offload ${ITFC} rx-vlan-offload off
+    ethtool --offload ${ITFC} tx-vlan-offload off
+    ethtool --offload ${ITFC} generic-segmentation-offload off
+    ethtool --offload ${ITFC} generic-receive-offload off
+    ethtool --offload ${ITFC} tcp-segmentation-offload off
+    ethtool --offload ${ITFC} tx-tcp-segmentation off
+    ethtool --offload ${ITFC} tx-tcp6-segmentation off
+    ethtool --pause ${ITFC} autoneg off
+    ethtool --pause ${ITFC} rx off
+    ethtool --pause ${ITFC} tx off
+done
+###
+
+
+
+
 ip link set dev xsock up
 
-# XSOCK SERVER (REAL)
-ip -4 rule add priority 10 table main  to ${SERVER_IP4}
-ip -4 rule add priority 11 table isp-0 to ${SERVER_IP4}
-ip -4 rule add priority 12 table isp-1 to ${SERVER_IP4}
-ip -4 rule add priority 13 table isp-2 to ${SERVER_IP4}
-# XSOCK SERVER <-> XSOCK LAN
-ip -4 rule add priority 14 table ${TABLE_XSOCK_LAN} iif xsock
-ip -4 rule add priority 15 table ${TABLE_XSOCK_SRV} oif xsock
-ip -4 rule add priority 17 table ${TABLE_XSOCK_LAN} to 172.16.${NID}.0/24
-ip -4 rule add priority 16 table ${TABLE_XSOCK_SRV} to 172.16.0.0/16
-ip -4 rule add priority 19 table ${TABLE_XSOCK_SRV} from 172.16.${NID}.0/24
-ip -4 rule add priority 18 table ${TABLE_XSOCK_LAN} from 172.16.0.0/16
-
-#
-ip -4 addr add dev xsock 172.16.${NID}.20/24 noprefixroute
-
+ip -4 rule add priority 10 table ${TABLE_XSOCK} to 172.16.0.0
+ip -4 rule add priority 10 table ${TABLE_XSOCK} from 172.16.0.1
+ip -4 rule add priority 10 table ${TABLE_XSOCK} oif xsock
+ip -4 addr add dev xsock 172.16.0.1
 #rttvar TIME (Linux 2.3.15+ only)
 #ssthresh NUMBER (Linux 2.3.15+ only)
-ip -4 route add table ${TABLE_XSOCK_SRV} dev xsock src 172.16.${NID}.20 default rtt 210ms rto_min 400ms
-ip -4 route add table ${TABLE_XSOCK_LAN} dev ${LAN_INTERFACE} src 172.16.${NID}.20 172.16.${NID}.0/24
-
-#
-sudo ip -4 rule add priority 30000 table ${TABLE_XSOCK_SRV}
-
+ip -4 route add table ${TABLE_XSOCK} dev xsock src 172.16.0.1 172.16.0.0 rtt 210ms rto_min 400ms
 ip -4 route flush cache
-ip -6 route flush cache
-
-sleep 1
-
-for PID in 0 1 2 ; do
-    ping 172.16.${NID}.0 -m $[30000+${PID}] -c 2
-done
