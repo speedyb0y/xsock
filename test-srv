@@ -8,5 +8,7 @@ echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
 echo  300 > /proc/sys/net/ipv4/tcp_reordering
 
+ip link set dev xsock up
+
 ip -4 addr add dev xsock 172.16.0.0
 ip -4 route add dev xsock src 172.16.0.0 172.16.0.1 rtt 210ms rto_min 400ms
