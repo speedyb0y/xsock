@@ -496,9 +496,6 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     //
     return NETDEV_TX_OK;
 
-    //
-    conn->pathsOn &= ~(0b00010001U << PID(conn));
-
 drop:
     dev_kfree_skb(skb);
 
