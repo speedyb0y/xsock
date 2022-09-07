@@ -58,8 +58,6 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #define _MAC(x) __A6(x)
 #define _IP4(x) __A4(x)
 
-#define ARRAY_COUNT(a) (sizeof(a)/sizeof((a)[0]))
-
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_SERVER_PORT XCONF_XSOCK_SERVER_PORT
 #define XSOCK_CONNS_N     XCONF_XSOCK_CONNS_N
@@ -584,7 +582,7 @@ static int __init xsock_init(void) {
     xdev = dev;
 
     // INITIALIZE CONNS
-    foreach (cid, ARRAY_COUNT(conns)) {
+    foreach (cid, XSOCK_CONNS_N) {
 
         xsock_conn_s* const conn = &conns[cid];
 
@@ -678,6 +676,11 @@ static int __init xsock_init(void) {
 static void __exit xsock_exit(void) {
 
     printk("XSOCK: EXIT\n");
+
+    //
+    foreach (cid, XSOCK_CONNS_N)
+        foreach (pid, XSOCK_PATHS_N)
+            dev_put(conns[cid]->paths[pid].itfc);
 
     if (xdev) {
         unregister_netdev(xdev);
