@@ -385,7 +385,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->tcp.cksum   = 0;
 
     // TODO: FIXME: SKB TRIM
-    skb->csum_valid = 1;
+//    skb->csum_valid = 1;
     skb->data             = PTR(&wire->ip);
     skb->mac_header       = PTR(&wire->ip)  - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
@@ -520,15 +520,14 @@ drop:
 
 static int xsock_dev_up (net_device_s* const dev) {
 
-    //dev->flags |= IFF_UP;
+    printk("XSOCK: UP\n");
 
     return 0;
 }
 
 static int xsock_dev_down (net_device_s* const dev) {
 
-    //if (dev->flags & IFF_UP)
-        //dev->flags ^= IFF_UP;
+    printk("XSOCK: DOWN\n");
 
     return 0;
 }
