@@ -620,7 +620,7 @@ static int __init xsock_init(void) {
             memcpy(path->eth.gw,   this->gw,  ETH_ALEN);
             memcpy(path->ip.saddr, this->addr, 4);
             memcpy(path->ip.daddr, peer->addr, 4);
-            
+
             path->itfc      =  NULL;
 #if XSOCK_SERVER
             path->iHash     = 0;
@@ -688,7 +688,7 @@ static void __exit xsock_exit(void) {
                     netdev_rx_handler_unregister(itfc);
                     itfc->hard_header_len -= sizeof(xsock_path_s) - ETH_HLEN;
                     itfc->min_header_len  -= sizeof(xsock_path_s) - ETH_HLEN;
-                }            
+                }
                 dev_put(itfc);
             }
         }
