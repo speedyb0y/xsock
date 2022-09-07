@@ -176,9 +176,9 @@ typedef union xsock_wire_s {
 
 typedef struct xsock_path_s {
     net_device_s* itfc;
-    u32 oBurst; // MÁXIMO DE TEMPO (EM JIFFIES) EM QUE CONSIDERA O PACOTE ATUAL PARTE DO MESMO BURST
-    u32 oTime; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE USAR ESTE PATH SEM PASSAR PARA OUTRO
-    u32 oPkts; // MÁXIMO DE PACOTES A ENVIAR
+    u32 oBurst; // QUANTO TEMPO (EM JIFFIES) CONSIDERAR NOVOS PACOTES PARTES DO MESMO BURST E PORTANTO PERMANECER NESTE PATH
+    u32 oTime; // MÁXIMO DE TEMPO (EM SEGUNDOS) ATÉ PASSAR PARA OUTRO PATH
+    u32 oPkts; // MÁXIMO DE PACOTES A ENVIAR ATÉ PASSAR PARA OUTRO PATH
 #if XSOCK_SERVER
     u32 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
     u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
@@ -226,7 +226,7 @@ typedef struct xsock_cfg_path_s {
     u8 addr[4];
     uint oBurst;
     uint oTime;
-    uint oPkts; // TOTAL DE PACOTES A CADA CIRCULADA
+    uint oPkts;
     uint iTimeout;
 } xsock_cfg_path_s;
 
