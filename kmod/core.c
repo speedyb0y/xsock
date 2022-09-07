@@ -329,7 +329,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // DECRYPT AND CONFIRM INTEGRITY AND AUTHENTICITY
     // TODO: E QUANTO AOS PAYLOADS SIZE 0? CONSIDERAR OS TCP SEQUENCE NUMBERS
-    if (xsock_crypto_decode(payload, payloadSize) != wire->ip.hash)
+    if (xsock_crypto_decode(payload, payloadSize) != BE16(wire->ip.hash))
         goto drop;
 
 #if XSOCK_SERVER
@@ -444,8 +444,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || conn->burst < now
      || conn->limit < now) {
         // CHANGE TO NEXT PATH
-        uint pid = (conn->paths - conn->path) + 1;
-        pid += __builtin_ctz(conn->pathsOn >> pid);
+        uint pid = (conn->path - conn->paths) + 1;
+        pid += __builtin_ctz((uint)conn->pathsOn >> pid);
         pid %= XSOCK_PATHS_N;
         conn->path  =      &conn->paths[pid];
         conn->pkts  =       conn->path->oPkts;
@@ -473,7 +473,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     //wire->fast.eth[7] = path->eth[7]; // 0x45 0x00 TODO:
     memcpy(wire->out.eth,    path->eth, 16);
     memcpy(wire->out.iaddrs, path->iaddrs, 8);
-           wire->out.ihash        = hash;
+           wire->out.ihash        = BE16(hash);
            wire->out.ittlProtocol = 0x1111U; // IPPROTO_UDP
            wire->out.icksum       = 0;
            wire->out.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
