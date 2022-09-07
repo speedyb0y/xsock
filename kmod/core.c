@@ -143,7 +143,7 @@ typedef union xsock_wire_s {
         u16 ifrag;
         u16 ittlProtocol;
         u16 icksum;
-        u16 ip[4];
+        u16 iaddrs[4];
         u16 tsrc;
         u16 tdst;
         u32 tseq;
@@ -160,7 +160,7 @@ typedef union xsock_wire_s {
         u16 ifrag;
         u16 ittlProtocol;
         u16 icksum;
-        u16 ip[4];
+        u16 iaddrs[4];
         u16 usrc;
         u16 udst;
         u16 usize;
@@ -464,8 +464,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     const uint hash = xsock_crypto_encode(payload, size);
 
     // RE-ENCAPSULATE
-    memcpy(wire->out.eth, &path->eth, 16);
-    memcpy(wire->out.ip,  &path->ip, 8);
+    memcpy(wire->out.eth,    &path->eth, 16);
+    memcpy(wire->out.iaddrs, &path->ip, 8);
            wire->out.ihash        = BE16(hash);
            wire->out.ittlProtocol = 0x1111U; // IPPROTO_UDP
            wire->out.icksum       = 0;
