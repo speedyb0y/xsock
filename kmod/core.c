@@ -164,7 +164,7 @@ typedef struct xsock_path_s {
     u64 reserved1;
 #endif
     u32 isUp; // ADMINISTRATIVELY
-    u32 pkts;
+    u32 pkts; // MÁXIMO DE PACOTES A ENVIAR
     u32 interval;
     u16 oLimit; // EM SEGUNDOS
 #if XSOCK_SERVER
