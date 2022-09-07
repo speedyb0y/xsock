@@ -389,7 +389,6 @@ drop:
 static inline void xsock_conn_path_on (xsock_conn_s* const restrict conn, const xsock_path_s* const restrict path, const uint pid) {
 
     conn->pathsOn |= (0b00010001U << pid) * (
-        path->isUp &&
 #if XSOCK_SERVER
         path->active >= jiffies &&
 #endif
