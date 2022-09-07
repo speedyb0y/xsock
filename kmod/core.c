@@ -429,40 +429,33 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_conn_s* const conn = &conns[cid];
 
+    //
+    xsock_path_s* path = conn->path;
+
+    uint c = XSOCK_PATHS_N;
+
     // CHOOSE PATH
-    loop {
-
-        //
+    while (conn->pkts == 0
+        || conn->burst < now
+        || conn->limit < now
 #if XSOCK_SERVER
-        if (conn->path->iActive
-         && conn->path->iActive < now) {
-            conn->path->iActive = 0;
-            conn->pathsOn--;
-        }
+        || path->iActive < now
 #endif
-        // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
-        if (!conn->pathsOn)
+        || path->itfc == NULL
+      || !(path->itfc->flags & IFF_UP)) {
+        // PATH INUSABLE
+        if (!c--)
+            // NENHUM PATH DISPONÍVEL
             goto drop;
-
-        // IF PATH IS OK, PROCEED WITH IT
-        if (conn->pkts
-         && conn->burst >= now
-         && conn->limit >= now
-         && conn->path->itfc->flags & IFF_UP)
-            break;
-
-        // CHANGE TO NEXT PATH
-        conn->path  =      &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
-        conn->pkts  =       conn->path->oPkts;
-        conn->limit = now + conn->path->oTime*HZ;
-        conn->burst = now + conn->path->oBurst;
+        // GO TO NEXT PATH
+        path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
+        conn->pkts = path->oPkts;
+        conn->limit = now + path->oTime*HZ;
     }
 
+    conn->path = path;
     conn->pkts--;
-    conn->burst = now + conn->path->oBurst;
-
-    //
-    const xsock_path_s* const path = conn->path;
+    conn->burst = now + path->oBurst;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
