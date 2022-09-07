@@ -286,7 +286,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->udp) - sizeof(xsock_wire_s);
+    xsock_wire_s* const wire = PTR(skb->data)
+                          + sizeof(wire->ip)
+                          + sizeof(wire->udp)
+                          - sizeof(xsock_wire_s);
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
