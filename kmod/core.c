@@ -156,21 +156,18 @@ typedef union xsock_wire_s {
 
 typedef struct xsock_path_s {
     net_device_s* itfc;
-#if XSOCK_SERVER
-    u64 hash; // THE PATH HASH
-    u64 active; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
-#else
-    u64 reserved0;
-    u64 reserved1;
-#endif
     u32 isUp; // ADMINISTRATIVELY
     u32 pkts; // MÁXIMO DE PACOTES A ENVIAR
     u32 interval; // MÁXIMO DE TEMPO (EM JIFFIES) EM QUE CONSIDERA O PACOTE ATUAL PARTE DO MESMO BURST
     u16 oLimit; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE USAR ESTE PATH SEM PASSAR PARA OUTRO
 #if XSOCK_SERVER
     u16 iLimit; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
+    u64 active; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
+    u64 hash; // THE PATH HASH
 #else
     u16 reserved2;
+    u64 reserved0;
+    u64 reserved1;
 #endif
     union {
             u8 iaddrs[8];
