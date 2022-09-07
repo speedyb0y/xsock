@@ -426,32 +426,31 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_conn_s* const conn = &conns[cid];
 
-    // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
-    if (!conn->pathsOn)
-        goto drop;
-
     const u64 now = jiffies;
 
     // CHOOSE PATH
-    if (conn->pkts == 0
-     || conn->burst < now
-     || conn->limit < now) {
+    while (conn->pkts == 0
+        || conn->burst < now
+        || conn->limit < now) {
+
+        // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
+        if (!conn->pathsOn)
+            goto drop;
+
         // CHANGE TO NEXT PATH
         uint pid = (conn->path - conn->paths) + 1;
         pid += __builtin_ctz((uint)conn->pathsOn >> pid);
         pid %= XSOCK_PATHS_N;
+
         conn->path  =      &conn->paths[pid];
         conn->pkts  =       conn->path->oPkts;
         conn->limit = now + conn->path->oTime*HZ;
-        conn->burst = now + conn->path->oBurst;
-    } else {
-        // STAY IN SAME PATH
-        conn->pkts--;
-        conn->burst = now + conn->path->oBurst;
     }
 
-    //
-    const xsock_path_s* const path = conn->path;
+    conn->pkts--;
+    conn->burst = now + conn->path->oBurst;
+
+    const xsock_path_s* path = conn->path;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
@@ -544,7 +543,7 @@ static void xsock_dev_setup (net_device_s* const dev) {
         ;
 }
 
-static int __init xsock_init(void) {
+static int __init xsock_init (void) {
 
 #if XSOCK_SERVER
     printk("XSOCK: SERVER INIT\n");
@@ -673,7 +672,7 @@ static int __init xsock_init(void) {
     return 0;
 }
 
-static void __exit xsock_exit(void) {
+static void __exit xsock_exit (void) {
 
     printk("XSOCK: EXIT\n");
 
