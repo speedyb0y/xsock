@@ -427,29 +427,43 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     const u64 now = jiffies;
 
-    uint c = XSOCK_PATHS_N;
-
     xsock_conn_s* const conn = &conns[cid];
 
-    // CHOOSE PATH
-    while (conn->pkts == 0
-        || conn->burst < now
-        || conn->limit < now
-#if XSOCK_SERVER
-        || conn->path->iActive < now
-#endif
-        || conn->path->itfc == NULL
-      || !(conn->path->itfc->flags & IFF_UP)) {
-        // PATH INUSABLE
-        if (!c--)
-            // NENHUM PATH DISPONÍVEL
-            goto drop;
-        // GO TO NEXT PATH
-        conn->path  =      &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
-        conn->pkts  =       conn->path->oPkts;
-        conn->limit = now + conn->path->oTime*HZ;
-    }
+    xsock_path_s* path = conn->path;
 
+    // CHOOSE PATH
+    if (conn->pkts == 0
+     || conn->burst < now
+     || conn->limit < now
+#if XSOCK_SERVER
+     || path->iActive < now
+#endif
+     || path->itfc == NULL
+   || !(path->itfc->flags & IFF_UP)) {
+        // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
+        uint c = XSOCK_PATHS_N;
+        do { // PATH INUSABLE
+            if (!c--)
+                // NENHUM PATH DISPONÍVEL
+                goto drop;
+            // GO TO NEXT PATH
+            path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];            
+        } while (path->pkts == 0
+#if XSOCK_SERVER
+              || path->iActive < now
+#endif
+              || path->itfc == NULL
+            || !(path->itfc->flags & IFF_UP)
+        );
+
+        //
+        if (c) {
+            conn->path  =       path;
+            conn->pkts  =       path->oPkts;
+            conn->limit = now + path->oTime*HZ;
+        }
+    }
+    
     conn->pkts--;
     conn->burst = now + conn->path->oBurst;
 
@@ -465,8 +479,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
            wire->out.useq         = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
            wire->out.usize        = BE16(sizeof(wire->udp) + size);
            wire->out.ucksum       = 0;
-    memcpy(wire->out.eth,    &conn->path->eth, sizeof(conn->path->eth));
-    memcpy(wire->out.iaddrs, &conn->path->ip, sizeof(conn->path->ip));
+    memcpy(wire->out.eth,    &path->eth, sizeof(path->eth));
+    memcpy(wire->out.iaddrs, &path->ip, sizeof(path->ip));
            wire->out.ihash        = BE16(hash);
            wire->out.ittlProtocol = BE16(0x4011U); // TTL 64 + IPPROTO_UDP
            wire->out.icksum       = 0;
@@ -479,7 +493,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     skb->len              = sizeof(*wire) - sizeof(wire->_align) + size;
     skb->mac_len          = ETH_HLEN;
     skb->ip_summed        = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
-    skb->dev              = conn->path->itfc;
+    skb->dev              = path->itfc;
 
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
