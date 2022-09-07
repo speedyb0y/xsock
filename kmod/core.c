@@ -425,38 +425,34 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (cid >= XSOCK_CONNS_N)
         goto drop;
 
-    xsock_conn_s* const conn = &conns[cid];
-
-    // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
-    if (!conn->pathsOn)
-        goto drop;
-
     const u64 now = jiffies;
 
-#if XSOCK_SERVER
-    if (conn->path->iActive < now)
-        if (!(conn->pathsOn &= ~(0b00010001U << PID(conn))))
-            goto drop;
-#endif
+    xsock_conn_s* const conn = &conns[cid];
 
     // CHOOSE PATH
-    if (conn->pkts == 0
-     || conn->burst < now
-     || conn->limit < now
-     || !(conn->path->itfc->flags & IFF_UP)) {
+    while (conn->pkts == 0
+        || conn->burst < now
+        || conn->limit < now
+      || !(conn->path->itfc->flags & IFF_UP)) {
+
+        // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
+        if (!conn->pathsOn)
+            goto drop;
+
+#if XSOCK_SERVER
+        if (conn->path->iActive < now)
+            if (!(conn->pathsOn &= ~(0b00010001U << PID(conn))))
+                goto drop;
+#endif
         // CHANGE TO NEXT PATH
-        uint pid = PID(conn) + 1;
-        pid += __builtin_ctz((uint)conn->pathsOn >> pid);
-        pid %= XSOCK_PATHS_N;
-        conn->path  =      &conn->paths[pid];
+        conn->path  =      &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
         conn->pkts  =       conn->path->oPkts;
         conn->limit = now + conn->path->oTime*HZ;
         conn->burst = now + conn->path->oBurst;
-    } else {
-        // STAY IN SAME PATH
-        conn->pkts--;
-        conn->burst = now + conn->path->oBurst;
     }
+
+    conn->pkts--;
+    conn->burst = now + conn->path->oBurst;
 
     //
     const xsock_path_s* const path = conn->path;
