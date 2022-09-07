@@ -440,8 +440,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 #endif
      || path->itfc == NULL
    || !(path->itfc->flags & IFF_UP)) {
+
         // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
         uint c = XSOCK_PATHS_N;
+        
         do { // PATH INUSABLE
             if (!c--)
                 // NENHUM PATH DISPONÍVEL
