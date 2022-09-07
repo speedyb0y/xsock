@@ -280,6 +280,7 @@ static u16 xsock_crypto_decode (void* data, uint size) {
     return size;
 }
 
+// TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
 static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     sk_buff_s* const skb = *pskb;
@@ -363,7 +364,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.cksum    = 0;
-    wire->tcp.dst     = BE16(7500);
+    wire->tcp.dst     = BE16(7500 + cid);
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
     wire->tcp.cksum   = 0;
@@ -417,14 +418,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.version != 0x45
-     || wire->tcp.dst    != BE16(7500)
      || wire->tcp.urgent)
         goto drop;
 
 #if XSOCK_SERVER
-    const uint cid = wire->ip.dst[3];
+    const uint cid = BE16(wire->tcp.dst) - 7500;
 #else
-    const uint cid = wire->ip.src[3];
+    const uint cid = BE16(wire->tcp.src) - 7500;
 #endif
     if (cid >= XSOCK_CONNS_N)
         goto drop;
