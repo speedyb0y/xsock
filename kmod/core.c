@@ -546,77 +546,6 @@ static void xsock_dev_setup (net_device_s* const dev) {
         ;
 }
 
-static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, xsock_path_s* const restrict path, const uint pid, const xsock_cfg_conn_s* const restrict cfg) {
-
-#if XSOCK_SERVER
-    const xsock_cfg_path_s* const peer = &cfg->clt[pid];
-    const xsock_cfg_path_s* const this = &cfg->srv[pid];
-#else
-    const xsock_cfg_path_s* const this = &cfg->clt[pid];
-    const xsock_cfg_path_s* const peer = &cfg->srv[pid];
-#endif
-
-    printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj TIME %us PKTS %u IN TIMEOUT %us ITFC %s"
-        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
-        " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
-        cid, pid, this->oBurst, this->oPkts, this->oTime, this->iTimeout, this->itfc,
-        _MAC(this->mac), _IP4(this->addr),
-        _MAC(this->gw),  _IP4(peer->addr)
-    );
-
-    memcpy(path->eth.mac,  this->mac, ETH_ALEN);
-    memcpy(path->eth.gw,   this->gw,  ETH_ALEN);
-    memcpy(path->ip.saddr, this->addr, 4);
-    memcpy(path->ip.daddr, peer->addr, 4);
-    
-    path->itfc      =  NULL;
-#if XSOCK_SERVER
-    path->iHash     = 0;
-    path->iActive   = 0;
-    path->iTimeout  = this->iTimeout;
-#else
-    path->reserved0 = 0;
-    path->reserved1 = 0;
-    path->reserved2 = 0;
-#endif
-    path->oPkts        = this->oPkts;
-    path->oBurst       = this->oBurst;
-    path->oTime        = this->oTime;
-    path->eth.type     = BE16(ETH_P_IP);
-    path->eth.iversion = 0x45;
-    path->eth.itos     = 0;
-
-    net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
-
-    if (itfc) {
-
-        rtnl_lock();
-
-        // HOOK INTERFACE
-        if (rcu_dereference(itfc->rx_handler) != xsock_in) {
-            // NOT HOOKED YET
-            if (!netdev_rx_handler_register(itfc, xsock_in, NULL)) {
-                // HOOK SUCCESS
-                // NOTE: ISSO É PARA QUE POSSA DAR FORWARD NOS PACOTES
-                // NOTE: A INTERFACE JA TEM O ETH_HLEN
-                itfc->hard_header_len += sizeof(xsock_path_s) - ETH_HLEN;
-                itfc->min_header_len  += sizeof(xsock_path_s) - ETH_HLEN;
-                //
-                path->itfc = itfc;
-            }
-        } else // ALREADY HOOKED
-            path->itfc = itfc;
-
-        rtnl_unlock();
-
-        if (!path->itfc) { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
-            printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT HOOKED\n", cid, pid);
-            dev_put(itfc);
-        }
-    } else
-        printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT FOUND\n", cid, pid);
-}
-
 static void xsock_conn_init (const xsock_cfg_conn_s* const cfg, xsock_conn_s* const conn, const uint cid) {
 
     printk("XSOCK: CONN %u: INITIALIZING\n", cid);
@@ -627,9 +556,80 @@ static void xsock_conn_init (const xsock_cfg_conn_s* const cfg, xsock_conn_s* co
     conn->burst   = 0;
     conn->limit   = 0;
     conn->pathsOn = 0;
+
     // INITIALIZE ITS PATHS
-    foreach (pid, XSOCK_PATHS_N)
-        xsock_path_init(conn, cid, &conn->paths[pid], pid, cfg);
+    foreach (pid, XSOCK_PATHS_N) {
+
+        xsock_path_s* const path = &conn->paths[pid];
+
+#if XSOCK_SERVER
+        const xsock_cfg_path_s* const peer = &cfg->clt[pid];
+        const xsock_cfg_path_s* const this = &cfg->srv[pid];
+#else
+        const xsock_cfg_path_s* const this = &cfg->clt[pid];
+        const xsock_cfg_path_s* const peer = &cfg->srv[pid];
+#endif
+
+        printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj TIME %us PKTS %u IN TIMEOUT %us ITFC %s"
+            " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
+            " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
+            cid, pid, this->oBurst, this->oPkts, this->oTime, this->iTimeout, this->itfc,
+            _MAC(this->mac), _IP4(this->addr),
+            _MAC(this->gw),  _IP4(peer->addr)
+        );
+
+        memcpy(path->eth.mac,  this->mac, ETH_ALEN);
+        memcpy(path->eth.gw,   this->gw,  ETH_ALEN);
+        memcpy(path->ip.saddr, this->addr, 4);
+        memcpy(path->ip.daddr, peer->addr, 4);
+        
+        path->itfc      =  NULL;
+#if XSOCK_SERVER
+        path->iHash     = 0;
+        path->iActive   = 0;
+        path->iTimeout  = this->iTimeout;
+#else
+        path->reserved0 = 0;
+        path->reserved1 = 0;
+        path->reserved2 = 0;
+#endif
+        path->oPkts        = this->oPkts;
+        path->oBurst       = this->oBurst;
+        path->oTime        = this->oTime;
+        path->eth.type     = BE16(ETH_P_IP);
+        path->eth.iversion = 0x45;
+        path->eth.itos     = 0;
+
+        net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
+
+        if (itfc) {
+
+            rtnl_lock();
+
+            // HOOK INTERFACE
+            if (rcu_dereference(itfc->rx_handler) != xsock_in) {
+                // NOT HOOKED YET
+                if (!netdev_rx_handler_register(itfc, xsock_in, NULL)) {
+                    // HOOK SUCCESS
+                    // NOTE: ISSO É PARA QUE POSSA DAR FORWARD NOS PACOTES
+                    // NOTE: A INTERFACE JA TEM O ETH_HLEN
+                    itfc->hard_header_len += sizeof(xsock_path_s) - ETH_HLEN;
+                    itfc->min_header_len  += sizeof(xsock_path_s) - ETH_HLEN;
+                    //
+                    path->itfc = itfc;
+                }
+            } else // ALREADY HOOKED
+                path->itfc = itfc;
+
+            rtnl_unlock();
+
+            if (!path->itfc) { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
+                printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT HOOKED\n", cid, pid);
+                dev_put(itfc);
+            }
+        } else
+            printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT FOUND\n", cid, pid);
+    }
 }
 
 static int __init xsock_init(void) {
