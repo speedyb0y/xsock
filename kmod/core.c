@@ -431,8 +431,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_conn_s* const conn = &conns[cid];
 
 #if XSOCK_SERVER
-    if (conn->path &&
-        conn->path->iActive < now)
+    if (conn->path->iActive < now)
         conn->pathsOn &= ~(0b00010001U << PATH_ID(conn, conn->path));
 #endif
     // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
@@ -599,7 +598,7 @@ static int __init xsock_init (void) {
         printk("XSOCK: CONN %u: INITIALIZING\n", cid);
 
         // INITIALIZE IT
-        conn->path    = NULL;
+        conn->path    = &conn->paths[0];
         conn->pkts    = 0;
         conn->burst   = 0;
         conn->limit   = 0;
