@@ -350,12 +350,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
           memcpy(path->ip.saddr, wire->ip.dst, 4);
           memcpy(path->ip.daddr, wire->ip.src, 4);
 
-        printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
-            " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n"
-            " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
+        printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
+            " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
+            " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             cid, pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->eth.mac), _IP4(path->ip.saddr),
-            _MAC(path->eth.gw),  _IP4(path->ip.daddr));
+            _MAC(path->eth.mac), _IP4(path->ip.saddr), BE16(wire->udp.src),
+            _MAC(path->eth.gw),  _IP4(path->ip.daddr), BE16(wire->udp.dst));
     }
 #endif
 
