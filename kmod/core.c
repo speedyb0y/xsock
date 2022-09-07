@@ -447,10 +447,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         uint pid = (conn->paths - conn->path) + 1;
         pid += __builtin_ctz(conn->pathsOn >> pid);
         pid %= XSOCK_PATHS_N;
-        conn->path  = &conn->paths[pid];
-        conn->pkts  = conn->path->pkts;
+        conn->path  =      &conn->paths[pid];
+        conn->pkts  =       conn->path->pkts;
         conn->limit = now + conn->path->oLimit*HZ;
-        conn->burst  = now + conn->path->interval;
+        conn->burst = now + conn->path->interval;
     } else {
         // STAY IN SAME PATH
         conn->pkts--;
