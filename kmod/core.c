@@ -228,8 +228,10 @@ typedef struct xsock_cfg_conn_s {
     xsock_cfg_path_s srv[XSOCK_PATHS_N];
 } xsock_cfg_conn_s;
 
-static net_device_s* xdev;
 #define CONN_ID(conn) ((uint)((conn) - conns))
+#define PATH_ID(conn, path) ((path) - (conn)->paths)
+
+static net_device_s* xdev;
 static xsock_conn_s conns[XSOCK_CONNS_N];
 
 static const xsock_cfg_conn_s cfg = {
@@ -393,10 +395,10 @@ static inline void xsock_conn_path_on (xsock_conn_s* const restrict conn, const 
 }
 
 // ALGUMA COISA FOI ZERADA
-static inline void xsock_conn_path_off (xsock_conn_s* const conn, const uint pid) {
+static inline void xsock_conn_path_off (xsock_conn_s* const conn, const xsock_path_s* const path, const uint pid) {
 
-    // SE O ATUAL FOI DESATIVADO, ENTÃO PASSA A USAR O PRÓXIMO
-    if (conn->path == &conn->paths[pid])
+    // SE O ATUAL FOR DESATIVADO, ENTÃO PASSA A USAR O PRÓXIMO
+    if (conn->path == path)
         conn->pkts = 0;
     conn->pathsOn &= ~(0b00010001U << pid);
 }
@@ -428,29 +430,35 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_conn_s* const conn = &conns[cid];
 
+#if XSOCK_SERVER
+    if (conn->path &&
+        conn->path->iActive <= now)
+        conn->pathsOn &= ~(0b00010001U << PATH_ID(conn, conn->path));
+#endif
+    // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
+    if (!conn->pathsOn)
+        goto drop;
+
     // CHOOSE PATH
-    while (conn->pkts == 0
-        || conn->burst < now
-        || conn->limit < now) {
-
-        // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
-        if (!conn->pathsOn)
-            goto drop;
-
+    if (conn->pkts == 0
+     || conn->burst < now
+     || conn->limit < now) {
         // CHANGE TO NEXT PATH
-        uint pid = (conn->path - conn->paths) + 1;
+        uint pid = PATH_ID(conn, conn->path) + 1;
         pid += __builtin_ctz((uint)conn->pathsOn >> pid);
         pid %= XSOCK_PATHS_N;
-
         conn->path  =      &conn->paths[pid];
         conn->pkts  =       conn->path->oPkts;
         conn->limit = now + conn->path->oTime*HZ;
+        conn->burst = now + conn->path->oBurst;
+    } else {
+        // STAY IN SAME PATH
+        conn->pkts--;
+        conn->burst = now + conn->path->oBurst;
     }
 
-    conn->pkts--;
-    conn->burst = now + conn->path->oBurst;
-
-    const xsock_path_s* path = conn->path;
+    //
+    const xsock_path_s* const path = conn->path;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
@@ -488,6 +496,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         //
         return NETDEV_TX_OK;
     }
+
+    //
+    conn->pathsOn &= ~(0b00010001U << PATH_ID(conn, conn->path));
 
 drop:
     dev_kfree_skb(skb);
@@ -681,13 +692,13 @@ static void __exit xsock_exit (void) {
         unregister_netdev(xdev);
         free_netdev(xdev);
     }
-    
+
     //
     foreach (cid, XSOCK_CONNS_N) {
         foreach (pid, XSOCK_PATHS_N) {
 
             net_device_s* itfc = conns[cid].paths[pid].itfc;
-            
+
             if (itfc) {
                 rtnl_lock();
                 if (rcu_dereference(itfc->rx_handler) == xsock_in) {
