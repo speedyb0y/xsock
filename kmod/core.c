@@ -450,10 +450,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         // STAY IN SAME PATH
         conn->pkts--;
         conn->last = now + conn->path->interval;
-    }        
+    }
 
     //
-    const xsock_path_s* const path = conn->path;    
+    const xsock_path_s* const path = conn->path;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
