@@ -87,6 +87,8 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 #error "BAD XSOCK_SERVER_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
 #endif
 
+#define SERVICE_PORT 7500
+
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
@@ -211,7 +213,7 @@ typedef struct xsock_conn_s {
     xsock_path_s* path;
     u64 pathsOn;
     u64 pkts;
-    u64 last; // LAST TIME A PACKET WAS SENT
+    u64 burst; //
     u64 limit;
     u64 reserved[3];
     xsock_path_s paths[XSOCK_PATHS_N];
@@ -364,7 +366,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.cksum    = 0;
-    wire->tcp.dst     = BE16(7500 + cid);
+    wire->tcp.dst     = BE16(SERVICE_PORT + cid);
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
     wire->tcp.cksum   = 0;
@@ -402,7 +404,7 @@ static inline void xsock_conn_path_off (xsock_conn_s* const conn, const uint pid
 
     // SE O ATUAL FOI DESATIVADO, ENTÃO PASSA A USAR O PRÓXIMO
     if (conn->path == &conn->paths[pid])
-        conn->last = 0;
+        conn->pkts = 0;
     conn->pathsOn &= ~(0b00010001U << pid);
 }
 
@@ -422,9 +424,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         goto drop;
 
 #if XSOCK_SERVER
-    const uint cid = BE16(wire->tcp.src) - 7500;
+    const uint cid = BE16(wire->tcp.src) - SERVICE_PORT;
 #else
-    const uint cid = BE16(wire->tcp.dst) - 7500;
+    const uint cid = BE16(wire->tcp.dst) - SERVICE_PORT;
 #endif
     if (cid >= XSOCK_CONNS_N)
         goto drop;
@@ -435,12 +437,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (!conn->pathsOn)
         goto drop;
 
-    // TODO: SE XSOCK_PATH_F_UP_ITFC FOR TRUE, ENTAO wire->itfc JÁ É TRUE
     const u64 now = jiffies;
 
     // CHOOSE PATH
     if (conn->pkts == 0
-     || conn->last < now
+     || conn->burst < now
      || conn->limit < now) {
         // CHANGE TO NEXT PATH
         uint pid = (conn->paths - conn->path) + 1;
@@ -449,11 +450,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         conn->path  = &conn->paths[pid];
         conn->pkts  = conn->path->pkts;
         conn->limit = now + conn->path->oLimit*HZ;
-        conn->last  = now + conn->path->interval;
+        conn->burst  = now + conn->path->interval;
     } else {
         // STAY IN SAME PATH
         conn->pkts--;
-        conn->last = now + conn->path->interval;
+        conn->burst = now + conn->path->interval;
     }
 
     //
@@ -627,7 +628,7 @@ static void xsock_conn_init (const xsock_cfg_conn_s* const cfg, xsock_conn_s* co
     // INITIALIZE IT
     conn->path    = NULL;
     conn->pkts    = 0;
-    conn->last    = 0;
+    conn->burst   = 0;
     conn->limit   = 0;
     conn->pathsOn = 0;
     // INITIALIZE ITS PATHS
