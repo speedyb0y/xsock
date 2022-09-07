@@ -143,7 +143,7 @@ typedef union xsock_wire_s {
         u16 ifrag;
         u16 ittlProtocol;
         u16 icksum;
-        u16 iaddrs[4];
+        u16 ip[4];
         u16 tsrc;
         u16 tdst;
         u32 tseq;
@@ -160,7 +160,7 @@ typedef union xsock_wire_s {
         u16 ifrag;
         u16 ittlProtocol;
         u16 icksum;
-        u16 iaddrs[4];
+        u16 ip[4];
         u16 usrc;
         u16 udst;
         u16 usize;
@@ -188,22 +188,17 @@ typedef struct xsock_path_s {
     u64 reserved0;
     u64 reserved1;
 #endif
-    union {
-            u8 iaddrs[8];
-        struct {
-            u8  saddr[4];
-            u8  daddr[4];
-        };
-    };
-    union {
-            u8  eth[16];
-        struct {
-            u8  gw[ETH_ALEN];
-            u8  mac[ETH_ALEN];
-            u16 etype;
-            u16 ivt; // IP VERSION + TOS
-        };
-    };
+    struct xsock_path_ip_s {
+        u8  saddr[4];
+        u8  daddr[4];
+    } ip;
+    struct xsock_path_eth_s {
+        u8  gw[ETH_ALEN];
+        u8  mac[ETH_ALEN];
+        u16 type;
+        u8 iversion;
+        u8 itos;
+    } eth;
 } xsock_path_s;
 
 // EXPECTED SIZE
@@ -349,17 +344,17 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
                  path->iActive = jiffies + path->iTimeout*HZ;
-          memcpy(path->mac,   wire->eth.dst, ETH_ALEN);
-          memcpy(path->gw,    wire->eth.src, ETH_ALEN);
-          memcpy(path->saddr, wire->ip.dst, 4);
-          memcpy(path->daddr, wire->ip.src, 4);
+          memcpy(path->eth.mac,  wire->eth.dst, ETH_ALEN);
+          memcpy(path->eth.gw,   wire->eth.src, ETH_ALEN);
+          memcpy(path->ip.saddr, wire->ip.dst, 4);
+          memcpy(path->ip.daddr, wire->ip.src, 4);
 
         printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s\n"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
             cid, pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->mac), _IP4(path->saddr),
-            _MAC(path->gw),  _IP4(path->daddr));
+            _MAC(path->eth.mac), _IP4(path->ip.saddr),
+            _MAC(path->eth.gw),  _IP4(path->ip.daddr));
     }
 #endif
 
@@ -469,10 +464,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     const uint hash = xsock_crypto_encode(payload, size);
 
     // RE-ENCAPSULATE
-    //wire->fast.eth[6] = path->eth[6]; // BE16(ETH_P_IP); TODO:
-    //wire->fast.eth[7] = path->eth[7]; // 0x45 0x00 TODO:
-    memcpy(wire->out.eth,    path->eth, 16);
-    memcpy(wire->out.iaddrs, path->iaddrs, 8);
+    memcpy(wire->out.eth, &path->eth, 16);
+    memcpy(wire->out.ip,  &path->ip, 8);
            wire->out.ihash        = BE16(hash);
            wire->out.ittlProtocol = 0x1111U; // IPPROTO_UDP
            wire->out.icksum       = 0;
@@ -571,6 +564,11 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
         _MAC(this->gw),  _IP4(peer->addr)
     );
 
+    memcpy(path->eth.mac,  this->mac, ETH_ALEN);
+    memcpy(path->eth.gw,   this->gw,  ETH_ALEN);
+    memcpy(path->ip.saddr, this->addr, 4);
+    memcpy(path->ip.daddr, peer->addr, 4);
+    
     path->itfc      =  NULL;
 #if XSOCK_SERVER
     path->iHash     = 0;
@@ -581,14 +579,12 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
     path->reserved1 = 0;
     path->reserved2 = 0;
 #endif
-    path->oPkts     = this->oPkts;
-    path->oBurst    = this->oBurst;
-    path->oTime     = this->oTime;
-
-    memcpy(path->mac,   this->mac, ETH_ALEN);
-    memcpy(path->gw,    this->gw,  ETH_ALEN);
-    memcpy(path->saddr, this->addr, 4);
-    memcpy(path->daddr, peer->addr, 4);
+    path->oPkts        = this->oPkts;
+    path->oBurst       = this->oBurst;
+    path->oTime        = this->oTime;
+    path->eth.type     = BE16(ETH_P_IP);
+    path->eth.iversion = 0x45;
+    path->eth.itos     = 0;
 
     net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
@@ -644,11 +640,12 @@ static int __init xsock_init(void) {
     printk("XSOCK: CLIENT INIT\n");
 #endif
 
+    BUILD_BUG_ON(sizeof(struct xsock_path_ip_s) != 8);
+    BUILD_BUG_ON(sizeof(struct xsock_path_eth_s) != 16);
     BUILD_BUG_ON(sizeof(struct xsock_wire_eth_s) != ETH_HLEN);
     BUILD_BUG_ON(sizeof(struct xsock_wire_ip_s) != sizeof(struct iphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_udp_s) != sizeof(struct xsock_wire_tcp_s));
-
     BUILD_BUG_ON(sizeof(struct xsock_wire_i_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(struct xsock_wire_o_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
