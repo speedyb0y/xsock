@@ -293,6 +293,14 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->tcp) - sizeof(xsock_wire_s);
 
+    // CONFIRM PACKET SIZE
+    // CONFIRM THIS IS ETHERNET/IPV4/UDP    
+    if ((PTR(wire) + sizeof(xsock_wire_s)) > SKB_TAIL(skb)
+     || wire->eth.type    != BE16(ETH_P_IP)
+     || wire->ip.version  != 0x45
+     || wire->ip.protocol != IPPROTO_UDP)
+        return RX_HANDLER_PASS;
+
     // IDENTIFY CONN AND PATH IDS FROM SERVER PORT
 #if XSOCK_SERVER
     const uint port = BE16(wire->udp.dst);
@@ -302,17 +310,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint cid = PORT_CID(port);
     const uint pid = PORT_PID(port);
 
-    // CONFIRM PACKET SIZE
-    // CONFIRM THIS IS ETHERNET/IPV4/UDP
     // VALIDATE CONN ID
     // VALIDATE PATH ID
-    if ((PTR(wire) + sizeof(xsock_wire_s)) > SKB_TAIL(skb)
-     || wire->eth.type    != BE16(ETH_P_IP)
-     || wire->ip.version  != 0x45
-     || wire->ip.protocol != IPPROTO_UDP
-     || cid >= XSOCK_CONNS_N
-     || pid >= XSOCK_PATHS_N
-    )
+    if (cid >= XSOCK_CONNS_N
+     || pid >= XSOCK_PATHS_N)
         return RX_HANDLER_PASS;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
