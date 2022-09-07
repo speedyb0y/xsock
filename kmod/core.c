@@ -414,7 +414,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.version != 0x45
-     || wire->tcp.dst    != 7500
+     || wire->tcp.dst    != BE16(7500)
      || wire->tcp.urgent)
         goto drop;
 
