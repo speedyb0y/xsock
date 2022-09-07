@@ -314,15 +314,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint payloadSize = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->udp);
+    const uint size = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->udp);
 
     // DROP INCOMPLETE PAYLOADS
-    if ((payload + payloadSize) > SKB_TAIL(skb))
+    if ((payload + size) > SKB_TAIL(skb))
         goto drop;
 
     // DECRYPT AND CONFIRM INTEGRITY AND AUTHENTICITY
     // TODO: E QUANTO AOS PAYLOADS SIZE 0? CONSIDERAR OS TCP SEQUENCE NUMBERS
-    if (xsock_crypto_decode(payload, payloadSize) != BE16(wire->ip.hash))
+    if (xsock_crypto_decode(payload, size) != BE16(wire->ip.hash))
         goto drop;
 
 #if XSOCK_SERVER
@@ -383,8 +383,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->data             = PTR(&wire->ip);
     skb->mac_header       = PTR(&wire->ip)  - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
-    skb->transport_header = PTR(&wire->tcp) - PTR(skb->head);
-    skb->len       = sizeof(wire->ip) + sizeof(wire->tcp) + payloadSize;
+    skb->len       = sizeof(wire->ip) + sizeof(wire->tcp) + size;
     skb->ip_summed = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
     skb->mac_len   = 0;
     skb->dev       = xdev;
