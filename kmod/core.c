@@ -429,9 +429,6 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_conn_s* const conn = &conns[cid];
 
-    //
-    xsock_path_s* path = conn->path;
-
     uint c = XSOCK_PATHS_N;
 
     // CHOOSE PATH
@@ -439,23 +436,22 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         || conn->burst < now
         || conn->limit < now
 #if XSOCK_SERVER
-        || path->iActive < now
+        || conn->path->iActive < now
 #endif
-        || path->itfc == NULL
-      || !(path->itfc->flags & IFF_UP)) {
+        || conn->path->itfc == NULL
+      || !(conn->path->itfc->flags & IFF_UP)) {
         // PATH INUSABLE
         if (!c--)
             // NENHUM PATH DISPONÍVEL
             goto drop;
         // GO TO NEXT PATH
-        path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
-        conn->pkts = path->oPkts;
-        conn->limit = now + path->oTime*HZ;
+        conn->path  =      &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
+        conn->pkts  =       conn->path->oPkts;
+        conn->limit = now + conn->path->oTime*HZ;
     }
 
-    conn->path = path;
     conn->pkts--;
-    conn->burst = now + path->oBurst;
+    conn->burst = now + conn->path->oBurst;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire) + sizeof(xsock_wire_s);
