@@ -467,7 +467,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     memcpy(wire->out.eth,    &path->eth, sizeof(path->eth));
     memcpy(wire->out.iaddrs, &path->ip, sizeof(path->ip));
            wire->out.ihash        = BE16(hash);
-           wire->out.ittlProtocol = 0x1111U; // IPPROTO_UDP
+           wire->out.ittlProtocol = BE16(0x1140U); // TTL 64 + IPPROTO_UDP
            wire->out.icksum       = 0;
            wire->out.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
            wire->out.useq         = wire->tcp.seq;
