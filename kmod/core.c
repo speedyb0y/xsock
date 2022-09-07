@@ -386,11 +386,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // TODO: FIXME: IGNORE IP CHECKSUM
     // TODO: FIXME: IGNORE TCP CHECKSUM
     // TODO: FIXME: SKB TRIM
+    skb->csum_valid = 1;
     skb->data             = PTR(&wire->ip);
     skb->mac_header       = PTR(&wire->ip)  - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
     skb->len       = sizeof(wire->ip) + sizeof(wire->tcp) + size;
-    skb->ip_summed = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
+    skb->ip_summed = CHECKSUM_UNNECESSARY;
     skb->mac_len   = 0;
     skb->dev       = xdev;
 
