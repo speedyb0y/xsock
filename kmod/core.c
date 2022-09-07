@@ -357,6 +357,19 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
+    wire->ip.src[0] = 172;
+    wire->ip.dst[0] = 172;
+    wire->ip.src[1] = 16;
+    wire->ip.dst[1] = 16;
+    wire->ip.src[2] = 0;
+    wire->ip.dst[2] = 0;
+#if XSOCK_SERVER
+    wire->ip.src[3] = 1;
+    wire->ip.dst[3] = 0;
+#else
+    wire->ip.src[3] = 0;
+    wire->ip.dst[3] = 1;
+#endif
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.cksum    = 0;
     wire->tcp.dst     = BE16(SERVICE_PORT + cid);
@@ -366,6 +379,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // TODO: FIXME: IGNORE IP CHECKSUM
     // TODO: FIXME: IGNORE TCP CHECKSUM
+    // TODO: FIXME: SKB TRIM
+    skb->data             = PTR(&wire->ip);
+    skb->mac_header       = PTR(&wire->ip)  - PTR(skb->head);
+    skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
+    skb->transport_header = PTR(&wire->tcp) - PTR(skb->head);
+    skb->len       = sizeof(wire->ip) + sizeof(wire->tcp) + payloadSize;
     skb->ip_summed = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
     skb->mac_len   = 0;
     skb->dev       = xdev;
