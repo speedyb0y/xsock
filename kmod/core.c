@@ -204,11 +204,10 @@ typedef struct xsock_path_s {
 
 typedef struct xsock_conn_s {
     xsock_path_s* path;
-    u64 pathsOn;
     u64 burst; //
     u64 pkts;
     u64 limit;
-    u64 reserved[3];
+    u64 reserved[4];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
 
@@ -379,27 +378,6 @@ drop:
     *pskb = NULL;
 
     return RX_HANDLER_CONSUMED;
-}
-
-// ALGUMA COISA FOI SETADA
-static inline void xsock_conn_path_on (xsock_conn_s* const restrict conn, const xsock_path_s* const restrict path, const uint pid) {
-
-    conn->pathsOn |= (0b00010001U << pid) * (
-#if XSOCK_SERVER
-        path->iActive >= jiffies &&
-#endif
-        path->itfc &&
-        path->itfc->flags & IFF_UP
-    );
-}
-
-// ALGUMA COISA FOI ZERADA
-static inline void xsock_conn_path_off (xsock_conn_s* const conn, const xsock_path_s* const path, const uint pid) {
-
-    // SE O ATUAL FOR DESATIVADO, ENTÃO PASSA A USAR O PRÓXIMO
-    if (conn->path == path)
-        conn->pkts = 0;
-    conn->pathsOn &= ~(0b00010001U << pid);
 }
 
 static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
@@ -608,7 +586,6 @@ static int __init xsock_init (void) {
         conn->pkts    = 0;
         conn->burst   = 0;
         conn->limit   = 0;
-        conn->pathsOn = 0;
 
         // INITIALIZE ITS PATHS
         foreach (pid, XSOCK_PATHS_N) {
