@@ -363,6 +363,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.cksum    = 0;
+    wire->tcp.dst     = BE16(7500);
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
     wire->tcp.cksum   = 0;
