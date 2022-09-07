@@ -142,13 +142,14 @@ typedef union xsock_wire_s {
         u16 ittlProtocol;
         u16 icksum;
         u16 iaddrs[4];
-        u32 tports;
+        u16 tsrc;
+        u16 tdst;
         u32 tseq;
         u32 tack;
         u32 tflagsWindow;
         u16 tcksum;
         u16 turgent;
-    } in;
+    } real;
     struct xsock_wire_o_s {
         u16 _align[5];
         u16 eth[8];
@@ -158,7 +159,8 @@ typedef union xsock_wire_s {
         u16 ittlProtocol;
         u16 icksum;
         u16 iaddrs[4];
-        u32 uports;
+        u16 usrc;
+        u16 udst;
         u16 usize;
         u16 ucksum;
         u32 uack;
@@ -289,13 +291,13 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->udp) - sizeof(xsock_wire_s);
+    xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->tcp) - sizeof(xsock_wire_s);
 
     // IDENTIFY CONN AND PATH IDS FROM SERVER PORT
 #if XSOCK_SERVER
-    const uint port = BE16(wire->udp.dst);
+    const uint port = BE16(wire->tcp.dst);
 #else
-    const uint port = BE16(wire->udp.src);
+    const uint port = BE16(wire->tcp.src);
 #endif
     const uint cid = PORT_CID(port);
     const uint pid = PORT_PID(port);
@@ -646,8 +648,8 @@ static int __init xsock_init(void) {
     BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_udp_s) != sizeof(struct xsock_wire_tcp_s));
 
-    BUILD_BUG_ON(sizeof(xsock_wire_i_s) != XSOCK_WIRE_SIZE);
-    BUILD_BUG_ON(sizeof(xsock_wire_o_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(struct xsock_wire_i_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(struct xsock_wire_o_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
@@ -693,7 +695,6 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("speedyb0y");
 MODULE_DESCRIPTION("XSOCK");
 MODULE_VERSION("0.1");
-
 
 /*
 TODO: RETIRAR TAIS PORTAS DOS EPHEMERAL PORTS
