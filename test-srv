@@ -8,32 +8,5 @@ echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
 echo  300 > /proc/sys/net/ipv4/tcp_reordering
 
-    iptables -t raw -A PREROUTING -j DROP   -s ${SERVER_IP4}
-    iptables -t raw -A PREROUTING -j DROP   -i ${SERVER_ITFC} -s 172.16.0.0/16
-    iptables -t raw -A PREROUTING -j ACCEPT -i ${SERVER_ITFC} -d ${SERVER_IP4}
-    iptables -t raw -A PREROUTING -j ACCEPT -i ${SERVER_ITFC} -d ${SERVER_IP4}
-    iptables -t raw -A PREROUTING -j ACCEPT -i ${SERVER_ITFC} -d ${SERVER_IP4}
-    iptables -t raw -A PREROUTING -j DROP   -i ${SERVER_ITFC}
-    iptables -t raw -A PREROUTING -j DROP   -d ${SERVER_IP4}
-    iptables -t raw -A PREROUTING -j DROP   -d ${SERVER_IP4}
-    iptables -t raw -A PREROUTING -j DROP   -d ${SERVER_IP4}
-for NID in $(seq 15) ; do
-    iptables -t raw -A PREROUTING -j ACCEPT -i xsock-${NID} -s 172.16.${NID}.0/24
-done
-    iptables -t raw -A PREROUTING -j DROP -s 172.16.0.0/16
-
-    iptables -t nat -A PREROUTING -i ${SERVER_ITFC} -p tcp --dport 10000:65000 -j DNAT --to-destination 172.16.1.20
-    iptables -t nat -A PREROUTING -i ${SERVER_ITFC} -p udp --dport 10000:65000 -j DNAT --to-destination 172.16.1.20
-
-    iptables -t nat -A POSTROUTING -j MASQUERADE -s 172.16.0.0/16 -o ${SERVER_ITFC}
-
-for NID in $(seq 15) ; do
-    if [ -e /proc/sys/net/ipv4/conf/xsock-${NID} ] ; then
-        echo 1 > /proc/sys/net/ipv4/conf/xsock-${NID}/forwarding
-        ip link set dev xsock-${NID} up
-        ip -4 addr add dev xsock-${NID} 172.16.255.255
-        ip -4 route add metric 1 dev xsock-${NID} src 172.16.255.255 172.16.${NID}.0/24 rtt 210ms rto_min 400ms
-    fi
-done
-
-echo 1 > /proc/sys/net/ipv4/ip_forward
+ip -4 addr add dev xsock 172.16.0.0
+ip -4 route add dev xsock src 172.16.0.0 172.16.0.1 rtt 210ms rto_min 400ms
