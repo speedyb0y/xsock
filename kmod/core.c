@@ -1,6 +1,9 @@
 /*
 
     TODO: NO CLIENTE, VAI TER QUE ALTERAR A PORTA DE TEMPOS EM TEMPOS SE NAO ESTIVER FUNCIONANDO
+        BASTA PASSAR A CONSIDERAR O SOURCE PORT COMO ESTATICO
+            E FAZER
+                - NO XMIT SPORT == CLT_PORT+cid, DPORT == SRV_PORT+cid
 */
 
 #include <linux/init.h>
@@ -390,7 +393,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->mac_header       = PTR(&wire->ip)  - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
     skb->len       = sizeof(wire->ip) + sizeof(wire->tcp) + size;
-    skb->ip_summed = CHECKSUM_UNNECESSARY;
+    skb->ip_summed = CHECKSUM_UNNECESSARY ; //CHECKSUM_UNNECESSARY;
     skb->mac_len   = 0;
     skb->dev       = xdev;
 
