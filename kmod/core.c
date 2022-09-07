@@ -362,15 +362,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // RE-ENCAPSULATE
     wire->ip.protocol = IPPROTO_TCP;
- // wire->ip.cksum
-    //wire->ip.src = ;
-    //wire->ip.dst = ;
- // wire->tcp.src
- // wire->tcp.dst
-    wire->tcp.seq = wire->udp.seq;
- // wire->tcp.cksum
-    wire->tcp.urgent = 0;
+    wire->tcp.seq     = wire->udp.seq;
+    wire->tcp.urgent  = 0;
 
+    // TODO: FIXME: IGNORE IP CHECKSUM
+    // TODO: FIXME: IGNORE TCP CHECKSUM
     skb->ip_summed = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
     skb->mac_len   = 0;
     skb->dev       = xdev;
