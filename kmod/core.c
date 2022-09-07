@@ -228,8 +228,7 @@ typedef struct xsock_cfg_conn_s {
     xsock_cfg_path_s srv[XSOCK_PATHS_N];
 } xsock_cfg_conn_s;
 
-#define CONN_ID(conn) ((uint)((conn) - conns))
-#define PATH_ID(conn, path) ((path) - (conn)->paths)
+#define PID(conn) ((conn)->path - (conn)->paths)
 
 static net_device_s* xdev;
 static xsock_conn_s conns[XSOCK_CONNS_N];
@@ -432,7 +431,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
 #if XSOCK_SERVER
     if (conn->path->iActive < now)
-        conn->pathsOn &= ~(0b00010001U << PATH_ID(conn, conn->path));
+        conn->pathsOn &= ~(0b00010001U << PID(conn));
 #endif
     // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
     if (!conn->pathsOn)
@@ -443,7 +442,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || conn->burst < now
      || conn->limit < now) {
         // CHANGE TO NEXT PATH
-        uint pid = PATH_ID(conn, conn->path) + 1;
+        uint pid = PID(conn) + 1;
         pid += __builtin_ctz((uint)conn->pathsOn >> pid);
         pid %= XSOCK_PATHS_N;
         conn->path  =      &conn->paths[pid];
@@ -497,7 +496,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     }
 
     //
-    conn->pathsOn &= ~(0b00010001U << PATH_ID(conn, conn->path));
+    conn->pathsOn &= ~(0b00010001U << PID(conn));
 
 drop:
     dev_kfree_skb(skb);
