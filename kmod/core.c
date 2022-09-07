@@ -312,9 +312,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         return RX_HANDLER_PASS;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
-    void* const payload = PTR(wire) + sizeof(xsock_wire_s);
+    void* const payload = PTR(wire)
+                    + sizeof(*wire);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint size = BE16(wire->ip.size) - sizeof(wire->ip) - sizeof(wire->udp);
+    const uint size = BE16(wire->ip.size)
+                  - sizeof(wire->ip)
+                  - sizeof(wire->udp);
 
     // DROP INCOMPLETE PAYLOADS
     if ((payload + size) > SKB_TAIL(skb))
