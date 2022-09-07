@@ -464,8 +464,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     const uint hash = xsock_crypto_encode(payload, size);
 
     // RE-ENCAPSULATE
-    memcpy(wire->out.eth,    &path->eth, 16);
-    memcpy(wire->out.iaddrs, &path->ip, 8);
+    memcpy(wire->out.eth,    &path->eth, sizeof(path->eth));
+    memcpy(wire->out.iaddrs, &path->ip, sizeof(path->ip));
            wire->out.ihash        = BE16(hash);
            wire->out.ittlProtocol = 0x1111U; // IPPROTO_UDP
            wire->out.icksum       = 0;
