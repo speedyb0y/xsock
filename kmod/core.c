@@ -680,7 +680,7 @@ static void __exit xsock_exit(void) {
     //
     foreach (cid, XSOCK_CONNS_N)
         foreach (pid, XSOCK_PATHS_N)
-            dev_put(conns[cid]->paths[pid].itfc);
+            dev_put(conns[cid].paths[pid].itfc);
 
     if (xdev) {
         unregister_netdev(xdev);
