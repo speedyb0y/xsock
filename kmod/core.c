@@ -424,9 +424,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (cid >= XSOCK_CONNS_N)
         goto drop;
 
-    xsock_conn_s* const conn = &conns[cid];
-
     const u64 now = jiffies;
+
+    xsock_conn_s* const conn = &conns[cid];
 
     // CHOOSE PATH
     while (conn->pkts == 0
