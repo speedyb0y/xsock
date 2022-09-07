@@ -568,7 +568,6 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
         _MAC(this->gw),  _IP4(peer->addr)
     );
 
-    path->isUp      = !0;
     path->itfc      =  NULL;
 #if XSOCK_SERVER
     path->hash      = 0;
