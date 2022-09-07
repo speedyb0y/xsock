@@ -8,6 +8,7 @@ CFLAGS_srv.o += -Wextra
 CFLAGS_srv.o += -Wno-declaration-after-statement
 CFLAGS_srv.o += -Wno-error=unused-parameter
 CFLAGS_srv.o += -Wno-error=unused-function
+CFLAGS_srv.o += -Wno-error=unused-label
 CFLAGS_srv.o += -Wno-type-limits
 CFLAGS_srv.o += -Wno-unused-parameter
 CFLAGS_srv.o += -mpopcnt
@@ -19,6 +20,7 @@ CFLAGS_clt.o += -Wextra
 CFLAGS_clt.o += -Wno-declaration-after-statement
 CFLAGS_clt.o += -Wno-error=unused-parameter
 CFLAGS_clt.o += -Wno-error=unused-function
+CFLAGS_clt.o += -Wno-error=unused-label
 CFLAGS_clt.o += -Wno-type-limits
 CFLAGS_clt.o += -Wno-unused-parameter
 CFLAGS_clt.o += -mpopcnt
