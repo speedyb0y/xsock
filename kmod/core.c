@@ -429,22 +429,25 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_conn_s* const conn = &conns[cid];
 
+#if XSOCK_SERVER
+    //
+    if (conn->path->iActive
+     && conn->path->iActive < now) {
+        conn->path->iActive = 0;
+        conn->pathsOn--;
+        goto next;
+    }
+#endif
+
     // CHOOSE PATH
     while (conn->pkts == 0
         || conn->burst < now
         || conn->limit < now
       || !(conn->path->itfc->flags & IFF_UP)) {
-
         // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
         if (!conn->pathsOn)
             goto drop;
-
-#if XSOCK_SERVER
-        if (conn->path->iActive < now)
-            if (!(conn->pathsOn &= ~(0b00010001U << PID(conn))))
-                goto drop;
-#endif
-        // CHANGE TO NEXT PATH
+next: // CHANGE TO NEXT PATH
         conn->path  =      &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
         conn->pkts  =       conn->path->oPkts;
         conn->limit = now + conn->path->oTime*HZ;
