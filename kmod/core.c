@@ -443,13 +443,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
         // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
         uint c = XSOCK_PATHS_N;
-        
+
         do { // PATH INUSABLE
             if (!c--)
                 // NENHUM PATH DISPONÍVEL
                 goto drop;
             // GO TO NEXT PATH
-            path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];            
+            path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
         } while (path->oPkts == 0
 #if XSOCK_SERVER
               || path->iActive < now
@@ -464,9 +464,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
             conn->pkts  =       path->oPkts;
             conn->limit = now + path->oTime*HZ;
         }
-    }
-    
-    conn->pkts--;
+
+    } else
+        conn->pkts--;
+
     conn->burst = now + conn->path->oBurst;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
