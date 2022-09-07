@@ -450,7 +450,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
                 goto drop;
             // GO TO NEXT PATH
             path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];            
-        } while (path->pkts == 0
+        } while (path->oPkts == 0
 #if XSOCK_SERVER
               || path->iActive < now
 #endif
