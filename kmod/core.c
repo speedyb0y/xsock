@@ -165,10 +165,10 @@ typedef struct xsock_path_s {
 #endif
     u32 isUp; // ADMINISTRATIVELY
     u32 pkts; // MÁXIMO DE PACOTES A ENVIAR
-    u32 interval;
-    u16 oLimit; // EM SEGUNDOS
+    u32 interval; // MÁXIMO DE TEMPO (EM JIFFIES) EM QUE CONSIDERA O PACOTE ATUAL PARTE DO MESMO BURST
+    u16 oLimit; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE USAR ESTE PATH SEM PASSAR PARA OUTRO
 #if XSOCK_SERVER
-    u16 iLimit; // EM SEGUNDOS
+    u16 iLimit; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
 #else
     u16 reserved2;
 #endif
@@ -546,10 +546,10 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
     const xsock_cfg_path_s* const peer = &cfg->srv[pid];
 #endif
 
-    printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH PKTS %u IN LIMIT %u OUT LIMIT %u ITFC %s"
+    printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH INTERVAL %uj PKTS %u IN LIMIT %us OUT LIMIT %us ITFC %s"
         " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
         " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
-        cid, pid, this->pkts, this->iLimit, this->oLimit, this->itfc,
+        cid, pid, this->interval, this->pkts, this->iLimit, this->oLimit, this->itfc,
         _MAC(this->mac), _IP4(this->addr),
         _MAC(this->gw),  _IP4(peer->addr)
     );
