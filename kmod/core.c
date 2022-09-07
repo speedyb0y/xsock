@@ -678,25 +678,30 @@ static void __exit xsock_exit(void) {
     printk("XSOCK: EXIT\n");
 
     //
+    if (xdev) {
+        unregister_netdev(xdev);
+        free_netdev(xdev);
+    }
+    
+    //
     foreach (cid, XSOCK_CONNS_N) {
         foreach (pid, XSOCK_PATHS_N) {
 
-            net_device_s* const itfc = conns[cid].paths[pid].itfc;
-
+            net_device_s* itfc = conns[cid].paths[pid].itfc;
+            
             if (itfc) {
+                rtnl_lock();
                 if (rcu_dereference(itfc->rx_handler) == xsock_in) {
                     netdev_rx_handler_unregister(itfc);
                     itfc->hard_header_len -= sizeof(xsock_path_s) - ETH_HLEN;
                     itfc->min_header_len  -= sizeof(xsock_path_s) - ETH_HLEN;
-                }
-                dev_put(itfc);
+                } else
+                    itfc = NULL;
+                rtnl_unlock();
+                if (itfc)
+                    dev_put(itfc);
             }
         }
-    }
-
-    if (xdev) {
-        unregister_netdev(xdev);
-        free_netdev(xdev);
     }
 }
 
