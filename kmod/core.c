@@ -429,18 +429,21 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_conn_s* const conn = &conns[cid];
 
-#if XSOCK_SERVER
-    if (conn->path->iActive < now)
-        conn->pathsOn &= ~(0b00010001U << PID(conn));
-#endif
     // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
     if (!conn->pathsOn)
         goto drop;
 
+#if XSOCK_SERVER
+    if (conn->path->iActive < now)
+        if (!(conn->pathsOn &= ~(0b00010001U << PID(conn))))
+            goto drop;
+#endif
+
     // CHOOSE PATH
     if (conn->pkts == 0
      || conn->burst < now
-     || conn->limit < now) {
+     || conn->limit < now
+     || !(conn->path->itfc->flags & IFF_UP)) {
         // CHANGE TO NEXT PATH
         uint pid = PID(conn) + 1;
         pid += __builtin_ctz((uint)conn->pathsOn >> pid);
@@ -486,14 +489,12 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     skb->ip_summed        = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
     skb->dev              = path->itfc;
 
-    if (skb->dev->flags & IFF_UP) {
-        // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
-        // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
-        // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
-        dev_queue_xmit(skb);
-        //
-        return NETDEV_TX_OK;
-    }
+    // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
+    // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
+    // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
+    dev_queue_xmit(skb);
+    //
+    return NETDEV_TX_OK;
 
     //
     conn->pathsOn &= ~(0b00010001U << PID(conn));
