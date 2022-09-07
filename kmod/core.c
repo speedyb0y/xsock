@@ -158,7 +158,7 @@ typedef struct xsock_path_s {
     net_device_s* itfc;
 #if XSOCK_SERVER
     u64 hash; // THE PATH HASH
-    u64 inTimeout;
+    u64 active; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
 #else
     u64 reserved0;
     u64 reserved1;
@@ -330,7 +330,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (unlikely(path->hash != hash)) {
                  path->hash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-                 path->inTimeout = jiffies + path->iLimit*HZ;
+                 path->active = jiffies + path->iLimit*HZ;
           memcpy(path->mac,   wire->eth.dst, ETH_ALEN);
           memcpy(path->gw,    wire->eth.src, ETH_ALEN);
           memcpy(path->saddr, wire->ip.dst, 4);
@@ -376,7 +376,7 @@ static inline void xsock_conn_path_on (xsock_conn_s* const restrict conn, const 
     conn->pathsOn |= (0b00010001U << pid) * (
         path->isUp &&
 #if XSOCK_SERVER
-        path->inTimeout >= jiffies &&
+        path->active >= jiffies &&
 #endif
         path->itfc &&
         path->itfc->flags & IFF_UP
@@ -558,7 +558,7 @@ static void xsock_path_init (xsock_conn_s* const restrict conn, const uint cid, 
     path->itfc      =  NULL;
 #if XSOCK_SERVER
     path->hash      = 0;
-    path->inTimeout = 0;
+    path->active = 0;
     path->iLimit    = this->iLimit;
 #else
     path->reserved0 = 0;
