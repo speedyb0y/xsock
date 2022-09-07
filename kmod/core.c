@@ -432,7 +432,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
 #if XSOCK_SERVER
     if (conn->path &&
-        conn->path->iActive <= now)
+        conn->path->iActive < now)
         conn->pathsOn &= ~(0b00010001U << PATH_ID(conn, conn->path));
 #endif
     // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
