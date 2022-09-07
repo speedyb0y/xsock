@@ -425,13 +425,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (cid >= XSOCK_CONNS_N)
         goto drop;
 
-    const u64 now = jiffies;
-
     xsock_conn_s* const conn = &conns[cid];
 
     // DROP SE NÃO TIVER NENHUM PATH DISPONÍVEL
     if (!conn->pathsOn)
         goto drop;
+
+    const u64 now = jiffies;
 
 #if XSOCK_SERVER
     if (conn->path->iActive < now)
