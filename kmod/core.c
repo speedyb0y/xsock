@@ -133,7 +133,23 @@ typedef union xsock_wire_s {
             } udp;
         };
     };
-    struct {
+    struct xsock_wire_i_s {
+        u16 _align[5];
+        u16 eth[8];
+        u16 isize;
+        u16 ihash;
+        u16 ifrag;
+        u16 ittlProtocol;
+        u16 icksum;
+        u16 iaddrs[4];
+        u32 tports;
+        u32 tseq;
+        u32 tack;
+        u32 tflagsWindow;
+        u16 tcksum;
+        u16 turgent;
+    } in;
+    struct xsock_wire_o_s {
         u16 _align[5];
         u16 eth[8];
         u16 isize;
@@ -247,7 +263,7 @@ static const xsock_cfg_conn_s cfg = {
     }
 };
 
-static u16 xsock_crypto_encode (void* restrict data, uint size) {
+static u16 xsock_crypto_encode (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -255,7 +271,7 @@ static u16 xsock_crypto_encode (void* restrict data, uint size) {
     return size;
 }
 
-static u16 xsock_crypto_decode (void* restrict data, uint size) {
+static u16 xsock_crypto_decode (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -630,6 +646,8 @@ static int __init xsock_init(void) {
     BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_udp_s) != sizeof(struct xsock_wire_tcp_s));
 
+    BUILD_BUG_ON(sizeof(xsock_wire_i_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(xsock_wire_o_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
