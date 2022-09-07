@@ -464,15 +464,15 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     const uint hash = xsock_crypto_encode(payload, size);
 
     // RE-ENCAPSULATE
+           wire->out.useq         = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+           wire->out.usize        = BE16(sizeof(wire->udp) + size);
+           wire->out.ucksum       = 0;
     memcpy(wire->out.eth,    &path->eth, sizeof(path->eth));
     memcpy(wire->out.iaddrs, &path->ip, sizeof(path->ip));
            wire->out.ihash        = BE16(hash);
            wire->out.ittlProtocol = BE16(0x4011U); // TTL 64 + IPPROTO_UDP
            wire->out.icksum       = 0;
            wire->out.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
-           wire->out.useq         = wire->tcp.seq;
-           wire->out.usize        = BE16(sizeof(wire->udp) + size);
-           wire->out.ucksum       = 0;
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
