@@ -422,9 +422,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         goto drop;
 
 #if XSOCK_SERVER
-    const uint cid = BE16(wire->tcp.dst) - 7500;
-#else
     const uint cid = BE16(wire->tcp.src) - 7500;
+#else
+    const uint cid = BE16(wire->tcp.dst) - 7500;
 #endif
     if (cid >= XSOCK_CONNS_N)
         goto drop;
