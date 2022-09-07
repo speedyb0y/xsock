@@ -622,6 +622,7 @@ static int __init xsock_init (void) {
             const xsock_cfg_path_s* const peer = &cfg.srv[pid];
 #endif
 
+            if (cid == 0)
             printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj TIME %us PKTS %u IN TIMEOUT %us ITFC %s"
                 " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
                 " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
