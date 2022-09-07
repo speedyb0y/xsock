@@ -290,7 +290,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->tcp) - sizeof(xsock_wire_s);
+    xsock_wire_s* const wire = PTR(skb->data) + sizeof(wire->ip) + sizeof(wire->udp) - sizeof(xsock_wire_s);
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
@@ -414,6 +414,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.version != 0x45
+     || wire->tcp.dst    != 7500
      || wire->tcp.urgent)
         goto drop;
 
