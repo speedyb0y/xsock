@@ -407,6 +407,9 @@ static inline void xsock_conn_path_off (xsock_conn_s* const conn, const uint pid
 
 static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
 
+    if (skb->protocol != BE16(ETH_P_IP))
+        goto drop;
+
     if (skb_linearize(skb))
         goto drop;
 
@@ -483,7 +486,6 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     skb->transport_header = PTR(&wire->udp) - PTR(skb->head);
     skb->len              = ETH_HLEN + size;
     skb->mac_len          = ETH_HLEN;
-    skb->protocol         = BE16(ETH_P_IP);
     skb->ip_summed        = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
     skb->dev              = path->itfc;
 
