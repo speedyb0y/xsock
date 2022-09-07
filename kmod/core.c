@@ -295,9 +295,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // IDENTIFY CONN AND PATH IDS FROM SERVER PORT
 #if XSOCK_SERVER
-    const uint port = BE16(wire->tcp.dst);
+    const uint port = BE16(wire->udp.dst);
 #else
-    const uint port = BE16(wire->tcp.src);
+    const uint port = BE16(wire->udp.src);
 #endif
     const uint cid = PORT_CID(port);
     const uint pid = PORT_PID(port);
