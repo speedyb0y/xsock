@@ -381,7 +381,6 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
        - sizeof(*wire);
 
     if (PTR(&wire->eth) < PTR(skb->head)
-     || wire->ip.version  != 0x45
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
      || wire->ip.src32   != ADDR_SRV_BE
@@ -390,11 +389,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.src32   != ADDR_CLT_BE
      || wire->ip.dst32   != ADDR_SRV_BE
 #endif
-     //|| wire->tcp.src    != wire->tcp.dst
-     || wire->tcp.urgent) {
-        printk("BAD PKT\n");
+    )
         goto drop;
-     }
 
 #if XSOCK_SERVER
     const uint cid = BE16(wire->tcp.src) - XSOCK_PORT;
@@ -466,7 +462,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 #else
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
-    // ARRASTA ANTES DE SOBRESCREVER
+    // ARRASTA ANTES DE SOBRESCREVER (NOTE: ASSUME QUE URGENT É 0)
            wire->udp.seq     = wire->tcp.seq;
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
