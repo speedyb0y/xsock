@@ -64,10 +64,10 @@ typedef struct net_device_ops net_device_ops_s;
 #define _MAC(x) __A6(x)
 #define _IP4(x) __A4(x)
 
-#define XSOCK_SERVER       XCONF_XSOCK_SERVER_IS
-#define XSOCK_PORT  XCONF_XSOCK_PORT
-#define XSOCK_CONNS_N      XCONF_XSOCK_CONNS_N
-#define XSOCK_PATHS_N      XCONF_XSOCK_PATHS_N
+#define XSOCK_SERVER   XCONF_XSOCK_SERVER_IS
+#define XSOCK_PORT     XCONF_XSOCK_PORT
+#define XSOCK_CONNS_N  XCONF_XSOCK_CONNS_N
+#define XSOCK_PATHS_N  XCONF_XSOCK_PATHS_N
 
 #if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
 #error "BAD XSOCK_PORT"
