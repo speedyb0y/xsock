@@ -149,11 +149,11 @@ typedef struct xsock_path_s {
     u64 reserved0;
     u64 reserved1;
 #endif
-    union { u8 saddr[4]; u32 saddr32; };
-    union { u8 daddr[4]; u32 daddr32; };
     u8  gw [ETH_ALEN];
     u8  mac[ETH_ALEN];
     u32 reservedXX;
+    union { u8 saddr[4]; u32 saddr32; };
+    union { u8 daddr[4]; u32 daddr32; };
 } xsock_path_s;
 
 // EXPECTED SIZE
