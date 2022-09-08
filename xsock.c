@@ -149,21 +149,19 @@ typedef struct xsock_wire_s {
 
 typedef struct xsock_path_s {
     net_device_s* itfc;
-    u32 oBurst; // QUANTO TEMPO (EM JIFFIES) CONSIDERAR NOVOS PACOTES PARTES DO MESMO BURST E PORTANTO PERMANECER NESTE PATH
-    u32 oPkts; // MÁXIMO DE PACOTES A ENVIAR ATÉ PASSAR PARA OUTRO PATH
-    u16 oTime; // MÁXIMO DE TEMPO (EM SEGUNDOS) ATÉ PASSAR PARA OUTRO PATH
 #if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
-    u16 cport;
+    u32 cport;
     u32 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
     u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
-    u16 reserved0;
-    u32 reserved1;
+    u64 reserved0;
+    u64 reserved1;
     u64 reserved2;
-    u64 reserved3;
 #endif
-    u32 reserved4;
+    u32 oBurst; // QUANTO TEMPO (EM JIFFIES) CONSIDERAR NOVOS PACOTES PARTES DO MESMO BURST E PORTANTO PERMANECER NESTE PATH
+    u32 oPkts; // MÁXIMO DE PACOTES A ENVIAR ATÉ PASSAR PARA OUTRO PATH
+    u32 oTime; // MÁXIMO DE TEMPO (EM SEGUNDOS) ATÉ PASSAR PARA OUTRO PATH
     u8  gw [ETH_ALEN];
     u8  mac[ETH_ALEN];
     union { u8 saddr[4]; u32 saddr32; };
@@ -630,9 +628,7 @@ static int __init xsock_init (void) {
             path->reserved0 = 0;
             path->reserved1 = 0;
             path->reserved2 = 0;
-            path->reserved3 = 0;
 #endif
-            path->reserved4 = 0;
             path->oPkts     = this->oPkts;
             path->oBurst    = this->oBurst;
             path->oTime     = this->oTime;
