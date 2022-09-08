@@ -144,14 +144,14 @@ typedef struct xsock_path_s {
     u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
-    u16 reserved3;
-    u32 reserved2;
-    u64 reserved0;
-    u64 reserved1;
+    u16 reserved0;
+    u32 reserved1;
+    u64 reserved2;
+    u64 reserved3;
 #endif
+    u32 reserved4;
     u8  gw [ETH_ALEN];
     u8  mac[ETH_ALEN];
-    u32 reservedXX;
     union { u8 saddr[4]; u32 saddr32; };
     union { u8 daddr[4]; u32 daddr32; };
 } xsock_path_s;
@@ -615,6 +615,7 @@ static int __init xsock_init (void) {
             path->reserved2 = 0;
             path->reserved3 = 0;
 #endif
+            path->reserved4 = 0;
             path->oPkts     = this->oPkts;
             path->oBurst    = this->oBurst;
             path->oTime     = this->oTime;
