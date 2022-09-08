@@ -289,7 +289,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT
-    if (BE16(xsock_crypto_decode(payload - 12, size - 12)) != wire->ip.hash) {
+    if (BE16(xsock_crypto_decode(payload - 12, size + 12)) != wire->ip.hash) {
         printk("BAD HASH\n");
         goto drop;
     }
