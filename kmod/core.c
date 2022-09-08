@@ -290,10 +290,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     xsock_path_s* const path = &conns[cid].paths[pid];
 
     // TODO: FIXME: MAS VAI TER QUE VALIDAR QUE REALMENTE É OFICIAL :S
+                 path->iActive = jiffies + path->iTimeout*HZ;
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-                 path->iActive = jiffies + path->iTimeout*HZ;
           memcpy(path->gw,       wire->eth.src, ETH_ALEN);
           memcpy(path->mac,      wire->eth.dst, ETH_ALEN);
                  path->saddr32 = wire->ip.dst32;
@@ -415,11 +415,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         ));
 
         //
-        //if (c) {
+        if (c) {
             conn->path  =       path;
             conn->pkts  =       path->oPkts;
             conn->limit = now + path->oTime*HZ;
-        //}
+        }
 
     } else
         conn->pkts--;
