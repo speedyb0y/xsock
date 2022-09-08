@@ -170,13 +170,13 @@ typedef struct xsock_conn_s {
 
 typedef struct xsock_cfg_path_s {
     char itfc[IFNAMSIZ];
-    u8 mac[ETH_ALEN];
-    u8 gw[ETH_ALEN];
-    u8 addr[4];
     uint oBurst;
     uint oTime;
     uint oPkts;
     uint iTimeout;
+    u8   mac[ETH_ALEN];
+    u8   gw[ETH_ALEN];
+    u8   addr[4];
 } xsock_cfg_path_s;
 
 typedef struct xsock_cfg_conn_s {
@@ -201,13 +201,13 @@ static const xsock_cfg_conn_s cfg = {
 #endif
     },
     .srv = {
-        { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/3, .oTime = 10, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/3, .oTime = 1, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, },
 #if XSOCK_PATHS_N > 1
-        { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/3, .oTime = 10, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/3, .oTime = 1, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, },
 #if XSOCK_PATHS_N > 2
-        { .oPkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .oBurst = HZ/3, .oTime = 10, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .oBurst = HZ/3, .oTime = 1, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, },
 #if XSOCK_PATHS_N > 3
-        { .oPkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .oBurst = HZ/3, .oTime = 10, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .oBurst = HZ/3, .oTime = 1, .iTimeout = 20, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, },
 #endif
 #endif
 #endif
