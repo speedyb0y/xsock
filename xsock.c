@@ -328,7 +328,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // RE-ENCAPSULATE
     wire->ip.protocol    = IPPROTO_TCP;
-    wire->ip.cksum = 0;
+    wire->ip.cksum       = 0;
 #if XSOCK_SERVER
     wire->ip.src32       = ADDR_CLT_BE;
     wire->ip.dst32       = ADDR_SRV_BE;
@@ -337,12 +337,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.dst32       = ADDR_CLT_BE;
 #endif
     wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
-    wire->tcp.src        = BE16(XSOCK_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
+    //wire->tcp.src        = BE16(XSOCK_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
     wire->tcp.dst        = BE16(XSOCK_PORT + cid);
     wire->tcp.seq        = wire->udp.seq;
     wire->tcp.urgent     = 0;
 
-    // TODO: FIXME: SKB TRIM
+    // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = PTR(&wire->ip);
     skb->mac_header      = PTR(&wire->ip) - PTR(skb->head);
     skb->network_header  = PTR(&wire->ip) - PTR(skb->head);
@@ -387,13 +387,17 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.src32   != ADDR_CLT_BE
      || wire->ip.dst32   != ADDR_SRV_BE
 #endif
-     || wire->tcp.src    != wire->tcp.dst
+     //|| wire->tcp.src    != wire->tcp.dst
      || wire->tcp.urgent) {
         printk("BAD PKT\n");
         goto drop;
      }
 
+#if XSOCK_SERVER
+    const uint cid = BE16(wire->tcp.src) - XSOCK_PORT;
+#else
     const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
+#endif
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
@@ -453,29 +457,27 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
                   - sizeof(wire->tcp);
 
     // RE-ENCAPSULATE
-    memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
-    memcpy(wire->eth.src,      path->mac, ETH_ALEN);
-           wire->eth.type    = BE16(ETH_P_IP);
-           //wire->ip.hash     = wire->tcp.cksum;
-           wire->ip.protocol = IPPROTO_UDP;
-           wire->ip.cksum    = 0;
-           wire->ip.src32    = path->saddr32;
-           wire->ip.dst32    = path->daddr32;
-    // ARRASTA ANTES DE SOBRESCREVER
-           wire->udp.seq     = wire->tcp.seq;
     // MULTIPLEXA ADICIONANDO O PID A PORTA
+#if XSOCK_SERVER
            wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
-#if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
-           wire->udp.dst     = path->cport;
 #else
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
+    // ARRASTA ANTES DE SOBRESCREVER
+           wire->udp.seq     = wire->tcp.seq;
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
     // ENCRYPT EVERYTHING AFTER THE UDP HEADER
            wire->ip.hash     = BE16(xsock_crypto_encode(payload - 12, size + 12));
+           wire->ip.protocol = IPPROTO_UDP;
+           wire->ip.cksum    = 0;
+           wire->ip.src32    = path->saddr32;
+           wire->ip.dst32    = path->daddr32;
     // COMPUTE AND SET IP CHECKSUM
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
+    memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
+    memcpy(wire->eth.src,      path->mac, ETH_ALEN);
+           wire->eth.type    = BE16(ETH_P_IP);
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
