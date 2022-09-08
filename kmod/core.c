@@ -402,9 +402,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         uint c = XSOCK_PATHS_N;
 
         do { // PATH INUSABLE
-            if (!c--)
+            if (!c--) {
                 // NENHUM PATH DISPONÍVEL
+                printk("XSOCK: XMIT: NENHUM PATH DISPONÍVEL\n");
                 goto drop;
+            }
             // GO TO NEXT PATH
             path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
         } while (path->oPkts == 0
@@ -472,6 +474,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     return NETDEV_TX_OK;
 
 drop:
+    printk("XSOCK: XMIT: DROP\n");
+
     dev_kfree_skb(skb);
 
     return NETDEV_TX_OK;
