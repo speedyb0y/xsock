@@ -126,8 +126,7 @@ typedef struct xsock_wire_s {
             u16 dst;
             u32 seq;
             u32 ack;
-            u16 flags;
-            u16 window;
+            u32 flagsWindow;
             u16 cksum;
             u16 urgent;
         } tcp;
@@ -137,8 +136,7 @@ typedef struct xsock_wire_s {
             u16 size;
             u16 cksum;
             u32 ack;
-            u16 flags;
-            u16 window;
+            u32 flagsWindow;
             u32 seq;
         } udp;
     };
