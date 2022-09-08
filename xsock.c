@@ -429,7 +429,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         ));
 
         //
-        if (c) {
+        if (conn->path !=       path) { // ASSERT: (c)
             conn->path  =       path;
             conn->pkts  =       path->oPkts;
             conn->limit = now + path->oTime*HZ;
