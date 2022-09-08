@@ -443,6 +443,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // RE-ENCAPSULATE
     memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
     memcpy(wire->eth.src,      path->mac, ETH_ALEN);
+           wire->eth.type    = BE16(ETH_P_IP);
            wire->ip.hash     = wire->tcp.cksum;
            wire->ip.ttl      = 64;
            wire->ip.protocol = IPPROTO_UDP;
