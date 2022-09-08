@@ -324,7 +324,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // DECRYPT
     wire->ip.hash       ^= BE16(xsock_crypto_decode(payload - 12, size - 12));
     wire->ip.protocol    = IPPROTO_TCP;
-    wire->ip.cksum       = 0;
+    wire->ip.cksum       = 0; // TODO: NAO RECOMPUTAR O CHECKSUM
 #if XSOCK_SERVER
     wire->ip.src32       = ADDR_CLT_BE;
     wire->ip.dst32       = ADDR_SRV_BE;
