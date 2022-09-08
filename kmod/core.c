@@ -295,11 +295,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
                  path->iActive = jiffies + path->iTimeout*HZ;
-          memcpy(path->mac,   wire->eth.dst, ETH_ALEN);
-          memcpy(path->gw,    wire->eth.src, ETH_ALEN);
-          memcpy(path->saddr, wire->ip.dst, 4);
-          memcpy(path->daddr, wire->ip.src, 4);
-                 path->cport  = wire->udp.src;
+          memcpy(path->gw,       wire->eth.src, ETH_ALEN);
+          memcpy(path->mac,      wire->eth.dst, ETH_ALEN);
+                 path->saddr32 = wire->ip.dst32;
+                 path->daddr32 = wire->ip.src32;
+                 path->cport   = wire->udp.src;
 
         printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
