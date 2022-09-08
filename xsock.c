@@ -288,9 +288,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if ((payload + size) > SKB_TAIL(skb))
         goto drop;
 
-    // DECRYPT TODO: E QUANTO AOS PAYLOADS SIZE 0? CONSIDERAR OS TCP SEQUENCE NUMBERS
-    const uint hash = xsock_crypto_decode(payload - 12, size - 12);
-
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
 #if XSOCK_SERVER
     // NOTE: O SERVER NÃO PODE RECEBER ALEATORIAMENTE COM  UM MESMO IP EM MAIS DE UMA INTERACE, SENÃO VAI FICAR TROCANDO TODA HORA AQUI
@@ -324,7 +321,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
-    wire->ip.hash       ^= BE16(hash);
+    // DECRYPT
+    wire->ip.hash       ^= BE16(xsock_crypto_decode(payload - 12, size - 12));
     wire->ip.protocol    = IPPROTO_TCP;
     wire->ip.cksum       = 0;
 #if XSOCK_SERVER
