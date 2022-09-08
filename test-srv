@@ -8,6 +8,8 @@ echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
 echo  300 > /proc/sys/net/ipv4/tcp_reordering
 
+ echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
+
 ip link set dev xsock up
 
 ip -4 addr add dev xsock 172.16.0.0
