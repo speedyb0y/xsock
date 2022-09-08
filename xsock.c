@@ -337,8 +337,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.dst32       = ADDR_CLT_BE;
 #endif
     wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
-    //wire->tcp.src        = BE16(XSOCK_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
+#if XSOCK_SERVER // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
     wire->tcp.dst        = BE16(XSOCK_PORT + cid);
+#else
+    wire->tcp.src        = BE16(XSOCK_PORT + cid);
+#endif
     wire->tcp.seq        = wire->udp.seq;
     wire->tcp.urgent     = 0;
 
