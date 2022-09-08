@@ -133,7 +133,7 @@ typedef union xsock_wire_s {
             } udp;
         };
     };
-    struct xsock_wire_i_s {
+    struct xsock_wire_orig_s {
         u16 _align[5];
         u16 eth[8];
         u16 isize;
@@ -150,8 +150,8 @@ typedef union xsock_wire_s {
         u32 tflagsWindow;
         u16 tcksum;
         u16 turgent;
-    } in;
-    struct xsock_wire_o_s {
+    } orig;
+    struct xsock_wire_fake_s {
         u16 _align[5];
         u16 eth[8];
         u16 isize;
@@ -167,7 +167,7 @@ typedef union xsock_wire_s {
         u32 uack;
         u32 uflagsWindow;
         u32 useq;
-    } out;
+    } fake;
 } xsock_wire_s;
 
 // EXPECTED SIZE
@@ -358,21 +358,21 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // RE-ENCAPSULATE
 #if XSOCK_SERVER    
-    wire->in.isrc         = BE32(0xAC100000);
-    wire->in.idst         = BE32(0xAC100001);
+    wire->orig.isrc         = BE32(0xAC100000);
+    wire->orig.idst         = BE32(0xAC100001);
 #else
-    wire->in.isrc         = BE32(0xAC100001);
-    wire->in.idst         = BE32(0xAC100000);
+    wire->orig.isrc         = BE32(0xAC100001);
+    wire->orig.idst         = BE32(0xAC100000);
 #endif
-    wire->in.ittlProtocol = BE16(0x4006U); // TTL 64 + IPPROTO_TCP
-    wire->in.icksum       = 0;
-    wire->in.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
+    wire->orig.ittlProtocol = BE16(0x4006U); // TTL 64 + IPPROTO_TCP
+    wire->orig.icksum       = 0;
+    wire->orig.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
 #if XSOCK_SERVER // O PACOTE DO CLIENTE VEM ALTERADO PELO NAT
-    wire->in.tsrc         = BE16(XSOCK_SERVER_PORT + cid);
+    wire->orig.tsrc         = wire->orig.tdst;
 #endif
-    wire->in.tseq         = wire->out.useq;
-    wire->in.tcksum       = wire->out.ihash;
-    wire->in.turgent      = 0;
+    wire->orig.tseq         = wire->fake.useq;
+    wire->orig.tcksum       = wire->fake.ihash;
+    wire->orig.turgent      = 0;
 
     // TODO: FIXME: SKB TRIM
     skb->data            = PTR(&wire->ip);
@@ -411,8 +411,15 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.version != 0x45
      || wire->ip.protocol != IPPROTO_TCP
-     || wire->tcp.src != wire->tcp.dst
-     || wire->tcp.urgent)
+#if XSOCK_SERVER
+     || wire->orig.isrc     != BE32(0xAC100001)
+     || wire->orig.idst     != BE32(0xAC100000)
+#else
+     || wire->orig.isrc     != BE32(0xAC100000)
+     || wire->orig.idst     != BE32(0xAC100001)
+#endif
+     || wire->orig.tsrc     != wire->orig.tdst
+     || wire->orig.turgent)
         goto drop;
 
     const uint cid = BE16(wire->tcp.dst) - XSOCK_SERVER_PORT;
@@ -477,18 +484,18 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_crypto_encode(payload, size);
 
     // RE-ENCAPSULATE
-           wire->out.ihash        = wire->in.tcksum; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
-           wire->out.useq         = wire->in.tseq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+           wire->fake.ihash        = wire->orig.tcksum; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+           wire->fake.useq         = wire->orig.tseq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
-           wire->out.udst         = path->cport;
+           wire->fake.udst         = path->cport;
 #endif
-           wire->out.usize        = BE16(sizeof(wire->udp) + size);
-           wire->out.ucksum       = 0;
-    memcpy(wire->out.eth,    &path->eth, sizeof(path->eth));
-    memcpy(wire->out.iaddrs, &path->ip, sizeof(path->ip));
-           wire->out.ittlProtocol = BE16(0x4011U); // TTL 64 + IPPROTO_UDP
-           wire->out.icksum       = 0;
-           wire->out.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
+           wire->fake.usize        = BE16(sizeof(wire->udp) + size);
+           wire->fake.ucksum       = 0;
+    memcpy(wire->fake.eth,    &path->eth, sizeof(path->eth));
+    memcpy(wire->fake.iaddrs, &path->ip, sizeof(path->ip));
+           wire->fake.ittlProtocol = BE16(0x4011U); // TTL 64 + IPPROTO_UDP
+           wire->fake.icksum       = 0;
+           wire->fake.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
@@ -578,8 +585,8 @@ static int __init xsock_init (void) {
     BUILD_BUG_ON(sizeof(struct xsock_wire_ip_s) != sizeof(struct iphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_udp_s) != sizeof(struct xsock_wire_tcp_s));
-    BUILD_BUG_ON(sizeof(struct xsock_wire_i_s) != XSOCK_WIRE_SIZE);
-    BUILD_BUG_ON(sizeof(struct xsock_wire_o_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(struct xsock_wire_orig_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(struct xsock_wire_fake_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
