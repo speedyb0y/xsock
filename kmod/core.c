@@ -371,7 +371,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.dst32   != BE32(0xAC100001)
 #else
      || wire->ip.src32   != BE32(0xAC100001)
-     || wire->ip.dst32   != BE32(0xAC10000)
+     || wire->ip.dst32   != BE32(0xAC100000)
 #endif
      || wire->tcp.src     != wire->tcp.dst
      || wire->tcp.urgent)
