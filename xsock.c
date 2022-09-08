@@ -289,7 +289,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT TODO: E QUANTO AOS PAYLOADS SIZE 0? CONSIDERAR OS TCP SEQUENCE NUMBERS
-    xsock_crypto_decode(payload, size);
+    const uint hash = xsock_crypto_decode(payload - 12, size - 12);
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
 #if XSOCK_SERVER
@@ -324,6 +324,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
+    wire->ip.hash       ^= BE16(hash);
+    wire->ip.protocol    = IPPROTO_TCP;
+    wire->ip.cksum       = 0;
 #if XSOCK_SERVER
     wire->ip.src32       = ADDR_CLT_BE;
     wire->ip.dst32       = ADDR_SRV_BE;
@@ -331,10 +334,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.src32       = ADDR_SRV_BE;
     wire->ip.dst32       = ADDR_CLT_BE;
 #endif
-    wire->ip.ttl         = 64;
-    wire->ip.protocol    = IPPROTO_TCP;
-    wire->ip.cksum       = 0;
-    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);    
+    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
     wire->tcp.src        = BE16(XSOCK_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
     wire->tcp.dst        = BE16(XSOCK_PORT + cid);
     wire->tcp.seq        = wire->udp.seq;
@@ -468,7 +468,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
     // ENCRYPT EVERYTHING AFTER THE UDP HEADER
-           wire->ip.hash    ^= xsock_crypto_encode(PTR(&wire->udp) + 8, size + 12);
+           wire->ip.hash    ^= BE16(xsock_crypto_encode(payload - 12, size + 12));
     // COMPUTE AND SET IP CHECKSUM
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);    
 
