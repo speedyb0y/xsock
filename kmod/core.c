@@ -424,7 +424,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     } else
         conn->pkts--;
 
-    conn->burst = now + conn->path->oBurst;
+    conn->burst = now + path->oBurst;
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire)
@@ -448,11 +448,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
-           wire->udp.src     = BE32(PORT(cid, (path - conn->paths)));
+           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
            wire->udp.dst     = path->cport;
 #else
-           wire->udp.dst     = BE32(PORT(cid, (path - conn->paths)));
+           wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
            wire->udp.seq     = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
