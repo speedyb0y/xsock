@@ -3,4 +3,4 @@
 #include "config-srv.h"
 #endif
 
-#include "core.c"
+#include "xsock.c"
