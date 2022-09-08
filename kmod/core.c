@@ -46,9 +46,15 @@ typedef struct net_device_ops net_device_ops_s;
 
 #define foreach(i, t) for (uint i = 0; i != (t); i++)
 
-static inline u16 BE16(u16 x) { return __builtin_bswap16(x); }
-static inline u32 BE32(u32 x) { return __builtin_bswap32(x); }
-static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
+#ifdef __BIG_ENDIAN
+#define BE16(x) (x)
+#define BE32(x) (x)
+#define BE64(x) (x)
+#else
+#define BE16(x) ((u16)__builtin_bswap16((u16)(x)))
+#define BE32(x) ((u32)__builtin_bswap32((u32)(x)))
+#define BE64(x) ((u64)__builtin_bswap64((u64)(x)))
+#endif
 
 #define CACHE_LINE_SIZE 64
 
@@ -73,6 +79,14 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 
 #if ! (1 <= XSOCK_PATHS_N && XSOCK_PATHS_N <= 4)
 #error "BAD XSOCK_PATHS_N"
+#endif
+
+#ifdef __BIG_ENDIAN
+#define ADDR_SRV_BE 0xAC100000U // 172.16.0.0
+#define ADDR_CLT_BE 0xAC100001U // 172.16.0.1
+#else
+#define ADDR_SRV_BE 0x000010ACU // 172.16.0.0
+#define ADDR_CLT_BE 0x010010ACU // 172.16.0.1
 #endif
 
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE CONN AND PATH
@@ -311,11 +325,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // RE-ENCAPSULATE
 #if XSOCK_SERVER
-    wire->ip.src32       = BE32(0xAC100001U);
-    wire->ip.dst32       = BE32(0xAC100000U);
+    wire->ip.src32       = ADDR_CLT_BE;
+    wire->ip.dst32       = ADDR_SRV_BE;
 #else
-    wire->ip.src32       = BE32(0xAC100000U);
-    wire->ip.dst32       = BE32(0xAC100001U);
+    wire->ip.src32       = ADDR_SRV_BE;
+    wire->ip.dst32       = ADDR_CLT_BE;
 #endif
     wire->ip.ttl         = 64;
     wire->ip.protocol    = IPPROTO_TCP;
@@ -365,11 +379,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.version  != 0x45
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
-     || wire->ip.src32   != BE32(0xAC100000U)
-     || wire->ip.dst32   != BE32(0xAC100001U)
+     || wire->ip.src32   != ADDR_SRV_BE
+     || wire->ip.dst32   != ADDR_CLT_BE
 #else
-     || wire->ip.src32   != BE32(0xAC100001U)
-     || wire->ip.dst32   != BE32(0xAC100000U)
+     || wire->ip.src32   != ADDR_CLT_BE
+     || wire->ip.dst32   != ADDR_SRV_BE
 #endif
      || wire->tcp.src    != wire->tcp.dst
      || wire->tcp.urgent)
