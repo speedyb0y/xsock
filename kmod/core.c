@@ -87,88 +87,47 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
-typedef struct xsock_wire_orig_s {
+typedef struct xsock_wire_s {
     u16 _align[5];
-    u16 eth[8];
-    u16 isize;
-    u16 ihash;
-    u16 ifrag;
-    u16 ittlProtocol;
-    u16 icksum;
-    u32 isrc;
-    u32 idst;
-    u16 tsrc;
-    u16 tdst;
-    u32 tseq;
-    u32 tack;
-    u32 tflagsWindow;
-    u16 tcksum;
-    u16 turgent;
-} xsock_wire_orig_s;
-
-typedef struct xsock_wire_fake_s {
-    u16 _align[5];
-    u16 eth[8];
-    u16 isize;
-    u16 ihash;
-    u16 ifrag;
-    u16 ittlProtocol;
-    u16 icksum;
-    u16 iaddrs[4];
-    u16 usrc;
-    u16 udst;
-    u16 usize;
-    u16 ucksum;
-    u32 uack;
-    u32 uflagsWindow;
-    u32 useq;
-} xsock_wire_fake_s;
-
-typedef union xsock_wire_s {
-    struct {
-        u16 _align[5];
-        struct xsock_wire_eth_s {
-            u8  dst[ETH_ALEN];
-            u8  src[ETH_ALEN];
-            u16 type;
-        } eth;
-        struct xsock_wire_ip_s {
-            u8  version;
-            u8  tos;
-            u16 size;
-            u16 hash; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
-            u16 frag;
-            u8  ttl;
-            u8  protocol;
+    struct xsock_wire_eth_s {
+        u8  dst[ETH_ALEN];
+        u8  src[ETH_ALEN];
+        u16 type;
+    } eth;
+    struct xsock_wire_ip_s {
+        u8  version;
+        u8  tos;
+        u16 size;
+        u16 hash; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
+        u16 frag;
+        u8  ttl;
+        u8  protocol;
+        u16 cksum;
+        union { u8 src[4]; u32 src32; };
+        union { u8 dst[4]; u32 dst32; };
+    } ip;
+    union {
+        struct xsock_wire_tcp_s { // AS ORIGINAL TCP
+            u16 src;
+            u16 dst;
+            u32 seq;
+            u32 ack;
+            u16 flags;
+            u16 window;
             u16 cksum;
-            u8  src[4];
-            u8  dst[4];
-        } ip;
-        union {
-            struct xsock_wire_tcp_s { // AS ORIGINAL TCP
-                u16 src;
-                u16 dst;
-                u32 seq;
-                u32 ack;
-                u16 flags;
-                u16 window;
-                u16 cksum;
-                u16 urgent;
-            } tcp;
-            struct xsock_wire_udp_s { // AS FAKE UDP
-                u16 src;
-                u16 dst;
-                u16 size;
-                u16 cksum;
-                u32 ack;
-                u16 flags;
-                u16 window;
-                u32 seq;
-            } udp;
-        };
+            u16 urgent;
+        } tcp;
+        struct xsock_wire_udp_s { // AS FAKE UDP
+            u16 src;
+            u16 dst;
+            u16 size;
+            u16 cksum;
+            u32 ack;
+            u16 flags;
+            u16 window;
+            u32 seq;
+        } udp;
     };
-    xsock_wire_orig_s orig;
-    xsock_wire_fake_s fake;
 } xsock_wire_s;
 
 // EXPECTED SIZE
@@ -190,17 +149,11 @@ typedef struct xsock_path_s {
     u64 reserved0;
     u64 reserved1;
 #endif
-    struct xsock_path_ip_s {
-        u8  saddr[4];
-        u8  daddr[4];
-    } ip;
-    struct xsock_path_eth_s {
-        u8  gw[ETH_ALEN];
-        u8  mac[ETH_ALEN];
-        u16 type;
-        u8 iversion;
-        u8 itos;
-    } eth;
+    union { u8 saddr[4]; u32 saddr32; };
+    union { u8 daddr[4]; u32 daddr32; };
+    u8  gw [ETH_ALEN];
+    u8  mac[ETH_ALEN];
+    u32 reservedXX;
 } xsock_path_s;
 
 // EXPECTED SIZE
@@ -342,38 +295,39 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
                  path->iActive = jiffies + path->iTimeout*HZ;
-                 path->cport   = wire->udp.src;
-          memcpy(path->eth.mac,  wire->eth.dst, ETH_ALEN);
-          memcpy(path->eth.gw,   wire->eth.src, ETH_ALEN);
-          memcpy(path->ip.saddr, wire->ip.dst, 4);
-          memcpy(path->ip.daddr, wire->ip.src, 4);
+          memcpy(path->mac,   wire->eth.dst, ETH_ALEN);
+          memcpy(path->gw,    wire->eth.src, ETH_ALEN);
+          memcpy(path->saddr, wire->ip.dst, 4);
+          memcpy(path->daddr, wire->ip.src, 4);
+                 path->cport  = wire->udp.src;
 
         printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             cid, pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->eth.mac), _IP4(path->ip.saddr), BE16(path->cport),
-            _MAC(path->eth.gw),  _IP4(path->ip.daddr), BE16(wire->udp.dst));
+            _MAC(path->mac), _IP4(path->saddr), BE16(path->cport),
+            _MAC(path->gw),  _IP4(path->daddr), BE16(wire->udp.dst));
     }
 #endif
 
     // RE-ENCAPSULATE
 #if XSOCK_SERVER
-    wire->orig.isrc         = BE32(0xAC100001);
-    wire->orig.idst         = BE32(0xAC100000);
+    wire->ip.src32       = BE32(0xAC100001);
+    wire->ip.dst32       = BE32(0xAC100000);
 #else
-    wire->orig.isrc         = BE32(0xAC100000);
-    wire->orig.idst         = BE32(0xAC100001);
+    wire->ip.src32       = BE32(0xAC100000);
+    wire->ip.dst32       = BE32(0xAC100001);
 #endif
-    wire->orig.ittlProtocol = BE16(0x4006U); // TTL 64 + IPPROTO_TCP
-    wire->orig.icksum       = 0;
-    wire->orig.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
+    wire->ip.ttl         = 64;
+    wire->ip.protocol    = IPPROTO_TCP;
+    wire->ip.cksum       = 0;
+    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
 #if XSOCK_SERVER // O PACOTE DO CLIENTE VEM ALTERADO PELO NAT
-    wire->orig.tsrc         = wire->orig.tdst;
+    wire->tcp.src        = wire->tcp.dst;
 #endif
-    wire->orig.tseq         = wire->fake.useq;
-    wire->orig.tcksum       = wire->fake.ihash;
-    wire->orig.turgent      = 0;
+    wire->tcp.seq        = wire->udp.seq;
+    wire->tcp.cksum      = wire->ip.hash;
+    wire->tcp.urgent     = 0;
 
     // TODO: FIXME: SKB TRIM
     skb->data            = PTR(&wire->ip);
@@ -410,17 +364,17 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
        - sizeof(*wire);
 
     if (PTR(&wire->eth) < PTR(skb->head)
-     || wire->ip.version != 0x45
+     || wire->ip.version  != 0x45
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
-     || wire->orig.isrc     != BE32(0xAC100000)
-     || wire->orig.idst     != BE32(0xAC100001)
+     || wire->ip.src32   != BE32(0xAC100000)
+     || wire->ip.dst32   != BE32(0xAC100001)
 #else
-     || wire->orig.isrc     != BE32(0xAC100001)
-     || wire->orig.idst     != BE32(0xAC100000)
+     || wire->ip.src32   != BE32(0xAC100001)
+     || wire->ip.dst32   != BE32(0xAC10000)
 #endif
-     || wire->orig.tsrc     != wire->orig.tdst
-     || wire->orig.turgent)
+     || wire->tcp.src     != wire->tcp.dst
+     || wire->tcp.urgent)
         goto drop;
 
     const uint cid = BE16(wire->tcp.dst) - XSOCK_SERVER_PORT;
@@ -485,18 +439,21 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_crypto_encode(payload, size);
 
     // RE-ENCAPSULATE
-           wire->fake.ihash        = wire->orig.tcksum; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
-           wire->fake.useq         = wire->orig.tseq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+           wire->ip.hash         = wire->tcp.cksum; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+           wire->udp.seq         = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
-           wire->fake.udst         = path->cport;
+           wire->udp.dst         = path->cport;
 #endif
-           wire->fake.usize        = BE16(sizeof(wire->udp) + size);
-           wire->fake.ucksum       = 0;
-    memcpy(wire->fake.eth,    &path->eth, sizeof(path->eth));
-    memcpy(wire->fake.iaddrs, &path->ip, sizeof(path->ip));
-           wire->fake.ittlProtocol = BE16(0x4011U); // TTL 64 + IPPROTO_UDP
-           wire->fake.icksum       = 0;
-           wire->fake.icksum       = ip_fast_csum(PTR(&wire->ip), 5);
+           wire->udp.size        = BE16(sizeof(wire->udp) + size);
+           wire->udp.cksum       = 0;
+    memcpy(wire->eth.dst,   path->gw, ETH_ALEN);
+    memcpy(wire->eth.src,   path->mac, ETH_ALEN);
+           wire->ip.src32       = path->saddr32;
+           wire->ip.dst32       = path->daddr32;
+           wire->ip.ttl         = 64;
+           wire->ip.protocol    = IPPROTO_UDP;
+           wire->ip.cksum       = 0;
+           wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
@@ -580,14 +537,10 @@ static int __init xsock_init (void) {
     printk("XSOCK: CLIENT INIT\n");
 #endif
 
-    BUILD_BUG_ON(sizeof(struct xsock_path_ip_s) != 8);
-    BUILD_BUG_ON(sizeof(struct xsock_path_eth_s) != 16);
     BUILD_BUG_ON(sizeof(struct xsock_wire_eth_s) != ETH_HLEN);
     BUILD_BUG_ON(sizeof(struct xsock_wire_ip_s) != sizeof(struct iphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_udp_s) != sizeof(struct xsock_wire_tcp_s));
-    BUILD_BUG_ON(sizeof(xsock_wire_orig_s) != XSOCK_WIRE_SIZE);
-    BUILD_BUG_ON(sizeof(xsock_wire_fake_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
@@ -645,10 +598,10 @@ static int __init xsock_init (void) {
                     _MAC(this->gw),  _IP4(peer->addr)
                 );
 
-            memcpy(path->eth.mac,  this->mac, ETH_ALEN);
-            memcpy(path->eth.gw,   this->gw,  ETH_ALEN);
-            memcpy(path->ip.saddr, this->addr, 4);
-            memcpy(path->ip.daddr, peer->addr, 4);
+            memcpy(path->mac,  this->mac, ETH_ALEN);
+            memcpy(path->gw,   this->gw,  ETH_ALEN);
+            memcpy(path->saddr, this->addr, 4);
+            memcpy(path->daddr, peer->addr, 4);
 
             path->itfc      =  NULL;
 #if XSOCK_SERVER
@@ -662,12 +615,9 @@ static int __init xsock_init (void) {
             path->reserved2 = 0;
             path->reserved3 = 0;
 #endif
-            path->oPkts        = this->oPkts;
-            path->oBurst       = this->oBurst;
-            path->oTime        = this->oTime;
-            path->eth.type     = BE16(ETH_P_IP);
-            path->eth.iversion = 0x45;
-            path->eth.itos     = 0;
+            path->oPkts     = this->oPkts;
+            path->oBurst    = this->oBurst;
+            path->oTime     = this->oTime;
 
             net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
