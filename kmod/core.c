@@ -321,8 +321,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.protocol    = IPPROTO_TCP;
     wire->ip.cksum       = 0;
     wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);    
-    wire->tcp.src        = BE16(XSOCK_SERVER_PORT); // DEMULTIPLEXA POS O PID ESTAVA EMBUTIDO NAS PORTAS
-    wire->tcp.dst        = BE16(XSOCK_SERVER_PORT);
+    wire->tcp.src        = BE16(XSOCK_SERVER_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
+    wire->tcp.dst        = BE16(XSOCK_SERVER_PORT + cid);
     wire->tcp.seq        = wire->udp.seq;
     wire->tcp.cksum      = wire->ip.hash;
     wire->tcp.urgent     = 0;
@@ -371,7 +371,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.src32   != BE32(0xAC100001U)
      || wire->ip.dst32   != BE32(0xAC100000U)
 #endif
-     || wire->tcp.src     != wire->tcp.dst
+     || wire->tcp.src    != wire->tcp.dst
      || wire->tcp.urgent)
         goto drop;
 
@@ -448,7 +448,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
-           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
+           wire->udp.src     = BE16(PORT(cid, (path - conn->paths))); // MULTIPLEXA ADICIONANDO O PID A PORTA
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
            wire->udp.dst     = path->cport;
 #else
