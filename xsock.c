@@ -226,18 +226,20 @@ static const xsock_cfg_conn_s cfg = {
     }
 };
 
-static void xsock_crypto_encode (void* data, uint size) {
+static uint xsock_crypto_encode (void* data, uint size) {
 
     (void)data;
     (void)size;
 
+    return size;
 }
 
-static void xsock_crypto_decode (void* data, uint size) {
+static uint xsock_crypto_decode (void* data, uint size) {
 
     (void)data;
     (void)size;
 
+    return size;
 }
 
 // TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
@@ -447,13 +449,14 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
                   - sizeof(wire->tcp);
 
     // ENCRYPT THE ORIGINAL PACKET
-    xsock_crypto_encode(payload, size);
+    const uint hash = xsock_crypto_encode(payload - (sizeof(wire->tcp) - 8),
+                                             size + (sizeof(wire->tcp) - 8));
 
     // RE-ENCAPSULATE
     memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
     memcpy(wire->eth.src,      path->mac, ETH_ALEN);
            wire->eth.type    = BE16(ETH_P_IP);
-           wire->ip.hash     = wire->tcp.cksum;
+           wire->ip.hash     = (hash + wire->tcp.cksum) & 0xFFFFU;
            wire->ip.ttl      = 64;
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
@@ -603,12 +606,16 @@ static int __init xsock_init (void) {
             const xsock_cfg_path_s* const this = &cfg.clt[pid];
             const xsock_cfg_path_s* const peer = &cfg.srv[pid];
 #endif
-
-            if (cid == 0)
-                printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj TIME %us PKTS %u IN TIMEOUT %us ITFC %s"
+            if (cid == 0 && this->oPkts)
+                printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX PKTS %u MAX TIME %us IN TIMEOUT %us ITFC %s"
                     " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
                     " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
-                    cid, pid, this->oBurst, this->oPkts, this->oTime, this->iTimeout, this->itfc,
+                    cid, pid,
+                    this->oBurst,
+                    this->oPkts,
+                    this->oTime,
+                    this->iTimeout,
+                    this->itfc,
                     _MAC(this->mac), _IP4(this->addr),
                     _MAC(this->gw),  _IP4(peer->addr)
                 );
