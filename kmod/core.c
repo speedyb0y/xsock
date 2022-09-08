@@ -289,6 +289,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     xsock_path_s* const path = &conns[cid].paths[pid];
 
+    // TODO: FIXME: MAS VAI TER QUE VALIDAR QUE REALMENTE É OFICIAL :S
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
@@ -303,8 +304,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             cid, pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->mac), _IP4(path->saddr), BE16(path->cport),
-            _MAC(path->gw),  _IP4(path->daddr), BE16(wire->udp.dst));
+            _MAC(path->mac), _IP4(path->saddr), BE16(wire->udp.dst),
+            _MAC(path->gw),  _IP4(path->daddr), BE16(path->cport));
     }
 #endif
 
@@ -319,10 +320,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.ttl         = 64;
     wire->ip.protocol    = IPPROTO_TCP;
     wire->ip.cksum       = 0;
-    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
-#if XSOCK_SERVER // O PACOTE DO CLIENTE VEM ALTERADO PELO NAT
-    wire->tcp.src        = wire->tcp.dst;
-#endif
+    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);    
+    wire->tcp.src        = BE16(XSOCK_SERVER_PORT); // DEMULTIPLEXA POS O PID ESTAVA EMBUTIDO NAS PORTAS
+    wire->tcp.dst        = BE16(XSOCK_SERVER_PORT);
     wire->tcp.seq        = wire->udp.seq;
     wire->tcp.cksum      = wire->ip.hash;
     wire->tcp.urgent     = 0;
@@ -448,8 +448,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
+           wire->tcp.src     = BE32(PORT(cid, pid));
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
            wire->udp.dst     = path->cport;
+#else
+           wire->tcp.dst     = BE32(PORT(cid, pid));
 #endif
            wire->udp.seq     = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
