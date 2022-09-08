@@ -402,6 +402,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         uint c = XSOCK_PATHS_N;
 
         do { // PATH INUSABLE
+#if XSOCK_SERVER
+            printk("CAN USE PATH %u? path->oPkts %u path->iActive >= now = %d\n", (uint)PID(conn), path->oPkts, (path->iActive >= now));
+#endif
             if (!c--) {
                 // NENHUM PATH DISPONÍVEL
                 printk("XSOCK: XMIT: NENHUM PATH DISPONÍVEL\n");
@@ -409,13 +412,14 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
             }
             // GO TO NEXT PATH
             path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
-        } while (path->oPkts == 0
+        } while (!(
+            path->oPkts
 #if XSOCK_SERVER
-              || path->iActive < now
+         && path->iActive >= now
 #endif
-              || path->itfc == NULL
-            || !(path->itfc->flags & IFF_UP)
-        );
+         && path->itfc
+         && path->itfc->flags & IFF_UP
+        ));
 
         //
         if (c) {
