@@ -452,24 +452,23 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
     memcpy(wire->eth.src,      path->mac, ETH_ALEN);
            wire->eth.type    = BE16(ETH_P_IP);
-           wire->ip.hash     = wire->tcp.cksum;
-           wire->ip.ttl      = 64;
+           wire->ip.hash     = wire->tcp.cksum;    
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
-           wire->udp.src     = BE16(PORT(cid, (path - conn->paths))); // MULTIPLEXA ADICIONANDO O PID A PORTA
+    // MULTIPLEXA ADICIONANDO O PID A PORTA
+           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
            wire->udp.dst     = path->cport;
 #else
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
-           wire->udp.seq     = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+           wire->udp.seq     = wire->tcp.seq; 
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
-           wire->udp.cksum   = 0;    
-    // ENCRYPT THE ORIGINAL PACKET
-           wire->ip.hash     = xsock_crypto_encode(payload - (sizeof(wire->tcp) - 8),
-                                                      size + (sizeof(wire->tcp) - 8));
+           wire->udp.cksum   = 0;
+    // ENCRYPT EVERYTHING AFTER THE UDP HEADER
+           wire->ip.hash    ^= xsock_crypto_encode(PTR(&wire->udp) + 8, size + 12);
     // COMPUTE AND SET IP CHECKSUM
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);    
 
