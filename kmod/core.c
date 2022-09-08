@@ -439,21 +439,21 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_crypto_encode(payload, size);
 
     // RE-ENCAPSULATE
-           wire->ip.hash         = wire->tcp.cksum; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
-           wire->udp.seq         = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+    memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
+    memcpy(wire->eth.src,      path->mac, ETH_ALEN);
+           wire->ip.hash     = wire->tcp.cksum;
+           wire->ip.ttl      = 64;
+           wire->ip.protocol = IPPROTO_UDP;
+           wire->ip.cksum    = 0;
+           wire->ip.src32    = path->saddr32;
+           wire->ip.dst32    = path->daddr32;
+           wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
-           wire->udp.dst         = path->cport;
+           wire->udp.dst     = path->cport;
 #endif
-           wire->udp.size        = BE16(sizeof(wire->udp) + size);
-           wire->udp.cksum       = 0;
-    memcpy(wire->eth.dst,   path->gw, ETH_ALEN);
-    memcpy(wire->eth.src,   path->mac, ETH_ALEN);
-           wire->ip.src32       = path->saddr32;
-           wire->ip.dst32       = path->daddr32;
-           wire->ip.ttl         = 64;
-           wire->ip.protocol    = IPPROTO_UDP;
-           wire->ip.cksum       = 0;
-           wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
+           wire->udp.seq     = wire->tcp.seq; // ARRASTA PARA FRENTE ANTES DE SOBRESCREVER
+           wire->udp.size    = BE16(sizeof(wire->udp) + size);
+           wire->udp.cksum   = 0;
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
