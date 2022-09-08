@@ -184,8 +184,6 @@ typedef struct xsock_cfg_conn_s {
     xsock_cfg_path_s srv[XSOCK_PATHS_N];
 } xsock_cfg_conn_s;
 
-#define PID(conn) ((conn)->path - (conn)->paths)
-
 static net_device_s* xdev;
 static xsock_conn_s conns[XSOCK_CONNS_N];
 
@@ -403,7 +401,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
         do { // PATH INUSABLE
 #if XSOCK_SERVER
-            printk("CAN USE PATH %u? path->oPkts %u path->iActive >= now = %d\n", (uint)PID(conn), path->oPkts, (path->iActive >= now));
+            printk("CAN USE PATH %u? path->oPkts %u path->iActive >= now = %d\n", (uint)(path - conn->paths), path->oPkts, (path->iActive >= now));
 #endif
             if (!c--) {
                 // NENHUM PATH DISPONÍVEL
@@ -411,7 +409,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
                 goto drop;
             }
             // GO TO NEXT PATH
-            path = &conn->paths[(PID(conn) + 1) % XSOCK_PATHS_N];
+            path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
         } while (!(
             path->oPkts
 #if XSOCK_SERVER
