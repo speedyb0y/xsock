@@ -328,7 +328,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // RE-ENCAPSULATE
     wire->ip.protocol    = IPPROTO_TCP;
-    //wire->ip.cksum       = 0; // TODO: NAO RECOMPUTAR O CHECKSUM
     wire->ip.cksum = 0;
 #if XSOCK_SERVER
     wire->ip.src32       = ADDR_CLT_BE;
@@ -337,7 +336,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.src32       = ADDR_SRV_BE;
     wire->ip.dst32       = ADDR_CLT_BE;
 #endif
-    //wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
+    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
     wire->tcp.src        = BE16(XSOCK_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
     wire->tcp.dst        = BE16(XSOCK_PORT + cid);
     wire->tcp.seq        = wire->udp.seq;
