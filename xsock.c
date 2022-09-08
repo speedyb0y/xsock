@@ -288,6 +288,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if ((payload + size) > SKB_TAIL(skb))
         goto drop;
 
+    // DECRYPT
+    if (BE16(xsock_crypto_decode(payload - 12, size - 12)) != wire->ip.hash) {
+        printk("BAD HASH\n");
+        goto drop;
+    }
+
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
 #if XSOCK_SERVER
     // NOTE: O SERVER NÃO PODE RECEBER ALEATORIAMENTE COM  UM MESMO IP EM MAIS DE UMA INTERACE, SENÃO VAI FICAR TROCANDO TODA HORA AQUI
@@ -321,10 +327,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
-    // DECRYPT
-    wire->ip.hash       ^= BE16(xsock_crypto_decode(payload - 12, size - 12));
     wire->ip.protocol    = IPPROTO_TCP;
-    wire->ip.cksum       = 0; // TODO: NAO RECOMPUTAR O CHECKSUM
+    //wire->ip.cksum       = 0; // TODO: NAO RECOMPUTAR O CHECKSUM
 #if XSOCK_SERVER
     wire->ip.src32       = ADDR_CLT_BE;
     wire->ip.dst32       = ADDR_SRV_BE;
@@ -332,11 +336,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.src32       = ADDR_SRV_BE;
     wire->ip.dst32       = ADDR_CLT_BE;
 #endif
-    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
+    //wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
     wire->tcp.src        = BE16(XSOCK_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
     wire->tcp.dst        = BE16(XSOCK_PORT + cid);
     wire->tcp.seq        = wire->udp.seq;
-    wire->tcp.cksum      = wire->ip.hash;
+    //wire->tcp.cksum      = wire->ip.hash ^ cksum;
     wire->tcp.urgent     = 0;
 
     // TODO: FIXME: SKB TRIM
@@ -348,7 +352,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                    + size;
     skb->mac_len   = 0;
     skb->dev       = xdev;
-    skb->ip_summed = CHECKSUM_NONE; //CHECKSUM_UNNECESSARY;
+    skb->ip_summed = CHECKSUM_UNNECESSARY; //;
 
     return RX_HANDLER_ANOTHER;
 
@@ -384,8 +388,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.dst32   != ADDR_SRV_BE
 #endif
      || wire->tcp.src    != wire->tcp.dst
-     || wire->tcp.urgent)
+     || wire->tcp.urgent) {
+        printk("BAD PKT\n");
         goto drop;
+     }
 
     const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
 
@@ -450,11 +456,13 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
     memcpy(wire->eth.src,      path->mac, ETH_ALEN);
            wire->eth.type    = BE16(ETH_P_IP);
-           wire->ip.hash     = wire->tcp.cksum;    
+           //wire->ip.hash     = wire->tcp.cksum;
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
+    // ARRASTA ANTES DE SOBRESCREVER
+           wire->udp.seq     = wire->tcp.seq;
     // MULTIPLEXA ADICIONANDO O PID A PORTA
            wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
 #if XSOCK_SERVER // O PACOTE PARA O CLIENTE VAI ALTERADO PELO NAT
@@ -462,13 +470,12 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 #else
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
-           wire->udp.seq     = wire->tcp.seq; 
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
     // ENCRYPT EVERYTHING AFTER THE UDP HEADER
-           wire->ip.hash    ^= BE16(xsock_crypto_encode(payload - 12, size + 12));
+           wire->ip.hash     = BE16(xsock_crypto_encode(payload - 12, size + 12));
     // COMPUTE AND SET IP CHECKSUM
-           wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);    
+           wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
@@ -487,6 +494,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     return NETDEV_TX_OK;
 
 drop:
+    printk("DROP!\n");
+
     dev_kfree_skb(skb);
 
     return NETDEV_TX_OK;
@@ -538,9 +547,15 @@ static void xsock_dev_setup (net_device_s* const dev) {
     dev->tx_queue_len    = 0; // DEFAULT_TX_QUEUE_LEN
     dev->flags           = IFF_NOARP; // IFF_BROADCAST | IFF_MULTICAST
     dev->priv_flags      = IFF_NO_QUEUE
+                         | IFF_NO_RX_HANDLER
                          | IFF_LIVE_ADDR_CHANGE
                          | IFF_LIVE_RENAME_OK
-                         | IFF_NO_RX_HANDLER
+        ;
+    dev->features        =
+    dev->hw_features     = NETIF_F_IP_CSUM
+                         | NETIF_F_IPV6_CSUM
+                         | NETIF_F_RXCSUM
+                         | NETIF_F_HW_CSUM
         ;
 }
 
