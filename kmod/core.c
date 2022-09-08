@@ -312,11 +312,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // RE-ENCAPSULATE
 #if XSOCK_SERVER
-    wire->ip.src32       = BE32(0xAC100001);
-    wire->ip.dst32       = BE32(0xAC100000);
+    wire->ip.src32       = BE32(0xAC100001U);
+    wire->ip.dst32       = BE32(0xAC100000U);
 #else
-    wire->ip.src32       = BE32(0xAC100000);
-    wire->ip.dst32       = BE32(0xAC100001);
+    wire->ip.src32       = BE32(0xAC100000U);
+    wire->ip.dst32       = BE32(0xAC100001U);
 #endif
     wire->ip.ttl         = 64;
     wire->ip.protocol    = IPPROTO_TCP;
@@ -367,11 +367,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.version  != 0x45
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
-     || wire->ip.src32   != BE32(0xAC100000)
-     || wire->ip.dst32   != BE32(0xAC100001)
+     || wire->ip.src32   != BE32(0xAC100000U)
+     || wire->ip.dst32   != BE32(0xAC100001U)
 #else
-     || wire->ip.src32   != BE32(0xAC100001)
-     || wire->ip.dst32   != BE32(0xAC100000)
+     || wire->ip.src32   != BE32(0xAC100001U)
+     || wire->ip.dst32   != BE32(0xAC100000U)
 #endif
      || wire->tcp.src     != wire->tcp.dst
      || wire->tcp.urgent)
