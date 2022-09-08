@@ -1,9 +1,6 @@
 /*
 
     TODO: NO CLIENTE, VAI TER QUE ALTERAR A PORTA DE TEMPOS EM TEMPOS SE NAO ESTIVER FUNCIONANDO
-        BASTA PASSAR A CONSIDERAR O SOURCE PORT COMO ESTATICO
-            E FAZER
-                - NO XMIT SPORT == CLT_PORT+cid, DPORT == SRV_PORT+cid
 */
 
 #include <linux/init.h>
@@ -90,6 +87,43 @@ static inline u64 BE64(u64 x) { return __builtin_bswap64(x); }
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
+typedef struct xsock_wire_orig_s {
+    u16 _align[5];
+    u16 eth[8];
+    u16 isize;
+    u16 ihash;
+    u16 ifrag;
+    u16 ittlProtocol;
+    u16 icksum;
+    u32 isrc;
+    u32 idst;
+    u16 tsrc;
+    u16 tdst;
+    u32 tseq;
+    u32 tack;
+    u32 tflagsWindow;
+    u16 tcksum;
+    u16 turgent;
+} xsock_wire_orig_s;
+
+typedef struct xsock_wire_fake_s {
+    u16 _align[5];
+    u16 eth[8];
+    u16 isize;
+    u16 ihash;
+    u16 ifrag;
+    u16 ittlProtocol;
+    u16 icksum;
+    u16 iaddrs[4];
+    u16 usrc;
+    u16 udst;
+    u16 usize;
+    u16 ucksum;
+    u32 uack;
+    u32 uflagsWindow;
+    u32 useq;
+} xsock_wire_fake_s;
+
 typedef union xsock_wire_s {
     struct {
         u16 _align[5];
@@ -133,41 +167,8 @@ typedef union xsock_wire_s {
             } udp;
         };
     };
-    struct xsock_wire_orig_s {
-        u16 _align[5];
-        u16 eth[8];
-        u16 isize;
-        u16 ihash;
-        u16 ifrag;
-        u16 ittlProtocol;
-        u16 icksum;
-        u32 isrc;
-        u32 idst;
-        u16 tsrc;
-        u16 tdst;
-        u32 tseq;
-        u32 tack;
-        u32 tflagsWindow;
-        u16 tcksum;
-        u16 turgent;
-    } orig;
-    struct xsock_wire_fake_s {
-        u16 _align[5];
-        u16 eth[8];
-        u16 isize;
-        u16 ihash;
-        u16 ifrag;
-        u16 ittlProtocol;
-        u16 icksum;
-        u16 iaddrs[4];
-        u16 usrc;
-        u16 udst;
-        u16 usize;
-        u16 ucksum;
-        u32 uack;
-        u32 uflagsWindow;
-        u32 useq;
-    } fake;
+    xsock_wire_orig_s orig;
+    xsock_wire_fake_s fake;
 } xsock_wire_s;
 
 // EXPECTED SIZE
@@ -357,12 +358,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
-#if XSOCK_SERVER    
-    wire->orig.isrc         = BE32(0xAC100000);
-    wire->orig.idst         = BE32(0xAC100001);
-#else
+#if XSOCK_SERVER
     wire->orig.isrc         = BE32(0xAC100001);
     wire->orig.idst         = BE32(0xAC100000);
+#else
+    wire->orig.isrc         = BE32(0xAC100000);
+    wire->orig.idst         = BE32(0xAC100001);
 #endif
     wire->orig.ittlProtocol = BE16(0x4006U); // TTL 64 + IPPROTO_TCP
     wire->orig.icksum       = 0;
@@ -585,8 +586,8 @@ static int __init xsock_init (void) {
     BUILD_BUG_ON(sizeof(struct xsock_wire_ip_s) != sizeof(struct iphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_udp_s) != sizeof(struct xsock_wire_tcp_s));
-    BUILD_BUG_ON(sizeof(struct xsock_wire_orig_s) != XSOCK_WIRE_SIZE);
-    BUILD_BUG_ON(sizeof(struct xsock_wire_fake_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(xsock_wire_orig_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(xsock_wire_fake_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
