@@ -65,12 +65,12 @@ typedef struct net_device_ops net_device_ops_s;
 #define _IP4(x) __A4(x)
 
 #define XSOCK_SERVER       XCONF_XSOCK_SERVER_IS
-#define XSOCK_SERVER_PORT  XCONF_XSOCK_SERVER_PORT
+#define XSOCK_PORT  XCONF_XSOCK_PORT
 #define XSOCK_CONNS_N      XCONF_XSOCK_CONNS_N
 #define XSOCK_PATHS_N      XCONF_XSOCK_PATHS_N
 
-#if ! (1 <= XSOCK_SERVER_PORT && XSOCK_SERVER_PORT <= 0xFFFF)
-#error "BAD XSOCK_SERVER_PORT"
+#if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
+#error "BAD XSOCK_PORT"
 #endif
 
 #if ! (1 <= XSOCK_CONNS_N && XSOCK_CONNS_N <= 0xFFFF)
@@ -90,12 +90,12 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE CONN AND PATH
-#define PORT(cid, pid) (XSOCK_SERVER_PORT + (cid)*10 + (pid))
-#define PORT_CID(port) (((port) - XSOCK_SERVER_PORT) / 10)
-#define PORT_PID(port) (((port) - XSOCK_SERVER_PORT) % 10)
+#define PORT(cid, pid) (XSOCK_PORT + (cid)*10 + (pid))
+#define PORT_CID(port) (((port) - XSOCK_PORT) / 10)
+#define PORT_PID(port) (((port) - XSOCK_PORT) % 10)
 
 #if PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
-#error "BAD XSOCK_SERVER_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
+#error "BAD XSOCK_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
 #endif
 
 // EXPECTED SIZE
@@ -335,8 +335,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.protocol    = IPPROTO_TCP;
     wire->ip.cksum       = 0;
     wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);    
-    wire->tcp.src        = BE16(XSOCK_SERVER_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
-    wire->tcp.dst        = BE16(XSOCK_SERVER_PORT + cid);
+    wire->tcp.src        = BE16(XSOCK_PORT + cid); // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
+    wire->tcp.dst        = BE16(XSOCK_PORT + cid);
     wire->tcp.seq        = wire->udp.seq;
     wire->tcp.cksum      = wire->ip.hash;
     wire->tcp.urgent     = 0;
@@ -389,7 +389,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->tcp.urgent)
         goto drop;
 
-    const uint cid = BE16(wire->tcp.dst) - XSOCK_SERVER_PORT;
+    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
