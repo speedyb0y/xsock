@@ -413,11 +413,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.version != 0x45
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
-     || wire->orig.isrc     != BE32(0xAC100001)
-     || wire->orig.idst     != BE32(0xAC100000)
-#else
      || wire->orig.isrc     != BE32(0xAC100000)
      || wire->orig.idst     != BE32(0xAC100001)
+#else
+     || wire->orig.isrc     != BE32(0xAC100001)
+     || wire->orig.idst     != BE32(0xAC100000)
 #endif
      || wire->orig.tsrc     != wire->orig.tdst
      || wire->orig.turgent)
