@@ -203,22 +203,23 @@ typedef struct xsock_cfg_path_s {
     u8   addr[4];
 } xsock_cfg_path_s;
 
+typedef struct xsock_cfg_side_s {
+    union { u8 addr[4]; u32 addr32; };
+    uint port;
+    xsock_cfg_path_s paths[XSOCK_PATHS_N];
+    xsock_cfg_path_s paths[XSOCK_PATHS_N];
+} xsock_cfg_side_s;
+
 typedef struct xsock_cfg_conn_s {
-    union { u8 sAddr[4]; u32 sAddr32; };
-    union { u8 cAddr[4]; u32 cAddr32; };    
-    uint cPort;
-    uint sPort;
-    xsock_cfg_path_s clt[XSOCK_PATHS_N];
-    xsock_cfg_path_s srv[XSOCK_PATHS_N];
+    xsock_cfg_side_s clt;
+    xsock_cfg_side_s srv;
 } xsock_cfg_conn_s;
 
 static net_device_s* xdev;
 static xsock_conn_s conns[XSOCK_CONNS_N];
 
 static const xsock_cfg_conn_s cfg = {
-    .sAddr = {172,16,0,0}, .sPort = 2000,
-    .cAddr = {172,16,0,1}, .cPort = 2000, 
-    .clt = {
+    .clt = { .addr = {172,16,0,1}, .port = 2000, .paths = {
         { .oPkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_0_PORT },
 #if XSOCK_PATHS_N > 1
         { .oPkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_1_PORT, },
@@ -229,8 +230,8 @@ static const xsock_cfg_conn_s cfg = {
 #endif
 #endif
 #endif
-    },
-    .srv = {
+    }},
+    .srv = { .addr = {172,16,0,0}, .port = 2000, .paths = {
         { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, .port = XCONF_XSOCK_SRV_PATH_0_PORT, },
 #if XSOCK_PATHS_N > 1
         { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, .port = XCONF_XSOCK_SRV_PATH_1_PORT, },
@@ -241,7 +242,7 @@ static const xsock_cfg_conn_s cfg = {
 #endif
 #endif
 #endif
-    }
+    }}
 };
 
 static uint xsock_crypto_encode (void* data, uint size) {
@@ -612,10 +613,10 @@ static int __init xsock_init (void) {
         conn->limit   = 0;
         conn->pkts    = 0;
 #if XSOCK_SERVER
-        conn->laddr   =      cfg.sAddr32;
-        conn->raddr   =      cfg.cAddr32;
-        conn->lport   = BE16(cfg.sPort);
-        conn->rport   = BE16(cfg.cPort + cid);
+        conn->laddr   =      cfg.srv.addr32;
+        conn->raddr   =      cfg.clt.addr32;
+        conn->lport   = BE16(cfg.srv.port);
+        conn->rport   = BE16(cfg.clt.port + cid);
 #else // PREENCHIDO PELA APLICACAO/ROTEAMENTO
         conn->laddr   = 0;
         conn->raddr   = 0;
