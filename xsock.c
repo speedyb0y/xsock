@@ -384,8 +384,94 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
-static void envia (const xsock_conn_s* const restrict conn, const uint cid, const xsock_path_s* const restrict path, xsock_wire_s* const restrict wire, sk_buff_s* const restrict skb) {
-    
+static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
+
+    if (skb->protocol != BE16(ETH_P_IP))
+        goto drop;
+
+    if (skb_linearize(skb))
+        goto drop;
+
+    xsock_wire_s* const wire = PTR(skb->data)
+        + sizeof(wire->ip)
+        + sizeof(wire->tcp)
+       - sizeof(*wire);
+
+    if (PTR(&wire->eth) < PTR(skb->head)
+     || wire->ip.protocol != IPPROTO_TCP
+#if XSOCK_SERVER
+     || wire->ip.src32   != ADDR_SRV_BE
+     || wire->ip.dst32   != ADDR_CLT_BE
+#else
+     || wire->ip.src32   != ADDR_CLT_BE
+     || wire->ip.dst32   != ADDR_SRV_BE
+#endif
+     || wire->tcp.src    != wire->tcp.dst
+    )
+        goto drop;
+
+    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
+
+    if (cid >= XSOCK_CONNS_N)
+        goto drop;
+
+    const u64 now = jiffies;
+
+    xsock_conn_s* const conn = &conns[cid];
+
+    xsock_path_s* path = conn->path;
+
+    // CHOOSE PATH
+    if (conn->pkts == 0
+     || conn->burst < now
+     || conn->limit < now
+#if XSOCK_SERVER
+     || path->iActive < now
+#endif
+     || path->itfc == NULL
+   || !(path->itfc->flags & IFF_UP)) {
+
+        // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
+        uint c = XSOCK_PATHS_N;
+
+        do { // PATH INUSABLE
+            if (!c--)
+                // NENHUM PATH DISPONÍVEL
+                goto drop;
+            // GO TO NEXT PATH
+            path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
+        } while (!(
+            path->oPkts
+#if XSOCK_SERVER
+         && path->iActive >= now
+#endif
+         && path->itfc
+         && path->itfc->flags & IFF_UP
+        ));
+
+        //
+        if (conn->path !=       path) {
+            conn->path  =       path;
+            conn->pkts  =       path->oPkts;
+            conn->limit = now + path->oTime*HZ;
+        }
+    } else
+        conn->pkts--;
+
+    conn->burst = now + path->oBurst;
+
+    // MANDA ESTE PELO PATH ATUAL, MAS TENTA OUTRO PATH EM SEGUIDA
+    if (wire->tcp.flags & (
+        XSOCK_WIRE_TCP_RST |
+        XSOCK_WIRE_TCP_SYN |
+        XSOCK_WIRE_TCP_FIN
+    ))
+        conn->pkts = 0;
+        //wire->tcp.flags == ( | XSOCK_WIRE_TCP_ACK) ||
+        //(wire->tcp.flags == XSOCK_WIRE_TCP_ACK &&
+            //conn->pkts % 100 == 5)
+        //) {
+
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire)
                     + sizeof(*wire);
@@ -431,115 +517,7 @@ static void envia (const xsock_conn_s* const restrict conn, const uint cid, cons
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
     // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
     dev_queue_xmit(skb);
-}
-
-static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
-
-    if (skb->protocol != BE16(ETH_P_IP))
-        goto drop;
-
-    if (skb_linearize(skb))
-        goto drop;
-
-    xsock_wire_s* const wire = PTR(skb->data)
-        + sizeof(wire->ip)
-        + sizeof(wire->tcp)
-       - sizeof(*wire);
-
-    if (PTR(&wire->eth) < PTR(skb->head)
-     || wire->ip.protocol != IPPROTO_TCP
-#if XSOCK_SERVER
-     || wire->ip.src32   != ADDR_SRV_BE
-     || wire->ip.dst32   != ADDR_CLT_BE
-#else
-     || wire->ip.src32   != ADDR_CLT_BE
-     || wire->ip.dst32   != ADDR_SRV_BE
-#endif
-     || wire->tcp.src    != wire->tcp.dst
-    )
-        goto drop;
-
-    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
-
-    if (cid >= XSOCK_CONNS_N)
-        goto drop;
-
-    const u64 now = jiffies;
-
-    xsock_conn_s* const conn = &conns[cid];
-
-    // TODO: SE FOR TCP SYN, SYN-ACK OU ACK, N-PLICAR CÓPIAS EM CADA PATH
-    if (wire->tcp.flags & (
-            XSOCK_WIRE_TCP_RST |
-            XSOCK_WIRE_TCP_FIN
-        ) ||
-        wire->tcp.flags == (XSOCK_WIRE_TCP_SYN | XSOCK_WIRE_TCP_ACK) ||
-        (wire->tcp.flags == XSOCK_WIRE_TCP_ACK &&
-            )
-        ) {
-        // MANDA EM TODOS OS PATHS
-        uint pid = XSOCK_PATHS_N;
-
-        while (pid--) {
-            
-            const xsock_path_s* const path = &conn->paths[pid];
-            
-            if (path->itfc &&
-                path->itfc->flags & IFF_UP) {
-                // TODO: pskb_copy()?
-                sk_buff_s* const skb2 = pid ? skb_copy(skb, GFP_ATOMIC) : skb;
-
-                if (skb2)
-                    envia(conn, cid, path, wire, skb2);
-            }
-        }
-
-        return;
-    }
-    
-    xsock_path_s* path = conn->path;
-
-    // CHOOSE PATH
-    if (conn->pkts == 0
-     || conn->burst < now
-     || conn->limit < now
-#if XSOCK_SERVER
-     || path->iActive < now
-#endif
-     || path->itfc == NULL
-   || !(path->itfc->flags & IFF_UP)) {
-
-        // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
-        uint c = XSOCK_PATHS_N;
-
-        do { // PATH INUSABLE
-            if (!c--)
-                // NENHUM PATH DISPONÍVEL
-                goto drop;
-            // GO TO NEXT PATH
-            path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
-        } while (!(
-            path->oPkts
-#if XSOCK_SERVER
-         && path->iActive >= now
-#endif
-         && path->itfc
-         && path->itfc->flags & IFF_UP
-        ));
-
-        //
-        if (conn->path !=       path) {
-            conn->path  =       path;
-            conn->pkts  =       path->oPkts;
-            conn->limit = now + path->oTime*HZ;
-        }
-    } else
-        conn->pkts--;
-
-    conn->burst = now + path->oBurst;
-
-    envia(conn, cid, path, wire, skb);
-
+    //
     return NETDEV_TX_OK;
 
 drop:
@@ -582,7 +560,6 @@ static const net_device_ops_s xsockDevOps = {
     // TODO: SET MTU - NAO EH PARA SETAR AQUI E SIM NO ROUTE
 };
 
-// TODO: FIXME: If the driver features set includes both NETIF_F_HW_CSUM and NETIF_F_IP_CSUM features, then you will get a kernel message saying "mixed HW and IP checksum settings." In such a case, the netdev_fix_features() method removes the NETIF_F_IP_CSUM feature.
 static void xsock_dev_setup (net_device_s* const dev) {
 
     dev->netdev_ops      = &xsockDevOps;
