@@ -43,8 +43,6 @@
 #define XCONF_XSOCK_CLT_PATH_2_MAC "\xd0\x50\x99\xae\xde\x92"
 #define XCONF_XSOCK_CLT_PATH_2_GW  "\x90\x55\xde\xa1\xcd\xf0"
 
-#define XCONF_XSOCK_SRV_PKTS 80000
-
 #define XCONF_XSOCK_SRV_PATH_0_ITFC "enp1s0"
 #define XCONF_XSOCK_SRV_PATH_0_ADDR_0 VPS_A
 #define XCONF_XSOCK_SRV_PATH_0_ADDR_1 VPS_B
