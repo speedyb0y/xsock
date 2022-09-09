@@ -364,82 +364,8 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
-static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
-
-    if (skb->protocol != BE16(ETH_P_IP))
-        goto drop;
-
-    if (skb_linearize(skb))
-        goto drop;
-
-    xsock_wire_s* const wire = PTR(skb->data)
-        + sizeof(wire->ip)
-        + sizeof(wire->tcp)
-       - sizeof(*wire);
-
-    if (PTR(&wire->eth) < PTR(skb->head)
-     || wire->ip.protocol != IPPROTO_TCP
-#if XSOCK_SERVER
-     || wire->ip.src32   != ADDR_SRV_BE
-     || wire->ip.dst32   != ADDR_CLT_BE
-#else
-     || wire->ip.src32   != ADDR_CLT_BE
-     || wire->ip.dst32   != ADDR_SRV_BE
-#endif
-     || wire->tcp.src    != wire->tcp.dst
-    )
-        goto drop;
-
-    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
-
-    if (cid >= XSOCK_CONNS_N)
-        goto drop;
-
-    const u64 now = jiffies;
-
-    xsock_conn_s* const conn = &conns[cid];
-
-    xsock_path_s* path = conn->path;
-
-    // CHOOSE PATH
-    if (conn->pkts == 0
-     || conn->burst < now
-     || conn->limit < now
-#if XSOCK_SERVER
-     || path->iActive < now
-#endif
-     || path->itfc == NULL
-   || !(path->itfc->flags & IFF_UP)) {
-
-        // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
-        uint c = XSOCK_PATHS_N;
-
-        do { // PATH INUSABLE
-            if (!c--)
-                // NENHUM PATH DISPONÍVEL
-                goto drop;
-            // GO TO NEXT PATH
-            path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
-        } while (!(
-            path->oPkts
-#if XSOCK_SERVER
-         && path->iActive >= now
-#endif
-         && path->itfc
-         && path->itfc->flags & IFF_UP
-        ));
-
-        //
-        if (conn->path !=       path) {
-            conn->path  =       path;
-            conn->pkts  =       path->oPkts;
-            conn->limit = now + path->oTime*HZ;
-        }
-    } else
-        conn->pkts--;
-
-    conn->burst = now + path->oBurst;
-
+static void envia (xsock_conn_s* const conn, xsock_path_s* const path, sk_buff_s* const skb) {
+    
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire)
                     + sizeof(*wire);
@@ -485,6 +411,122 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
     // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
     dev_queue_xmit(skb);
+}
+
+static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
+
+    if (skb->protocol != BE16(ETH_P_IP))
+        goto drop;
+
+    if (skb_linearize(skb))
+        goto drop;
+
+    xsock_wire_s* const wire = PTR(skb->data)
+        + sizeof(wire->ip)
+        + sizeof(wire->tcp)
+       - sizeof(*wire);
+
+    if (PTR(&wire->eth) < PTR(skb->head)
+     || wire->ip.protocol != IPPROTO_TCP
+#if XSOCK_SERVER
+     || wire->ip.src32   != ADDR_SRV_BE
+     || wire->ip.dst32   != ADDR_CLT_BE
+#else
+     || wire->ip.src32   != ADDR_CLT_BE
+     || wire->ip.dst32   != ADDR_SRV_BE
+#endif
+     || wire->tcp.src    != wire->tcp.dst
+    )
+        goto drop;
+
+    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
+
+    if (cid >= XSOCK_CONNS_N)
+        goto drop;
+
+    const u64 now = jiffies;
+
+    xsock_conn_s* const conn = &conns[cid];
+
+    // TODO: SE FOR TCP SYN, SYN-ACK OU ACK, N-PLICAR CÓPIAS EM CADA PATH
+
+#if __BIG_ENDIAN
+#define XSOCK_WIRE_TCP_ACK 0b0000000000010000U
+#define XSOCK_WIRE_TCP_PSH 0b0000000000001000U
+#define XSOCK_WIRE_TCP_RST 0b0000000000000100U
+#define XSOCK_WIRE_TCP_SYN 0b0000000000000010U
+#define XSOCK_WIRE_TCP_FIN 0b0000000000000001U
+#else
+#define XSOCK_WIRE_TCP_ACK 0b0001000000000000U
+#define XSOCK_WIRE_TCP_PSH 0b0000100000000000U
+#define XSOCK_WIRE_TCP_RST 0b0000010000000000U
+#define XSOCK_WIRE_TCP_SYN 0b0000001000000000U
+#define XSOCK_WIRE_TCP_FIN 0b0000000100000000U
+#endif
+    if (wire->tcp.flags & (
+            XSOCK_WIRE_TCP_RST |
+            XSOCK_WIRE_TCP_SYN |
+            XSOCK_WIRE_TCP_FIN
+        )) {
+        // MANDA EM TODOS OS PATHS
+        foreach (pid, XSOCK_PATHS_N) {
+            
+            const xsock_path_s* const path = conn->paths[pid];
+            
+            if (path->itfc &&
+                path->itfc->flags & IFF_UP) {
+                // TODO: pskb_copy()?
+                sk_buff_s* const skb2 = skb_copy(skb, GFP_ATOMIC);
+                if (skb2)
+                    envia(conn, path, skb2);
+            }
+        }
+    } else {
+        
+        xsock_path_s* path = conn->path;
+
+        // CHOOSE PATH
+        if (conn->pkts == 0
+         || conn->burst < now
+         || conn->limit < now
+#if XSOCK_SERVER
+         || path->iActive < now
+#endif
+         || path->itfc == NULL
+       || !(path->itfc->flags & IFF_UP)) {
+
+            // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
+            uint c = XSOCK_PATHS_N;
+
+            do { // PATH INUSABLE
+                if (!c--)
+                    // NENHUM PATH DISPONÍVEL
+                    goto drop;
+                // GO TO NEXT PATH
+                path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
+            } while (!(
+                path->oPkts
+#if XSOCK_SERVER
+             && path->iActive >= now
+#endif
+             && path->itfc
+             && path->itfc->flags & IFF_UP
+            ));
+
+            //
+            if (conn->path !=       path) {
+                conn->path  =       path;
+                conn->pkts  =       path->oPkts;
+                conn->limit = now + path->oTime*HZ;
+            }
+        } else
+            conn->pkts--;
+
+        conn->burst = now + path->oBurst;
+
+        envia(skb, conn, path);
+    }
+    
     //
     return NETDEV_TX_OK;
 
