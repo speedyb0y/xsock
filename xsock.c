@@ -170,7 +170,8 @@ typedef struct xsock_wire_s {
 typedef struct xsock_path_s {
     net_device_s* itfc;
 #if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
-    u32 cport;
+    u16 reserved3;
+    u16 cport;
     u32 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
     u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
@@ -673,6 +674,7 @@ static int __init xsock_init (void) {
             path->iActive   = 0;
             path->iTimeout  = this->iTimeout;
             path->cport     = 0;
+            path->reserved3 = 0;
 #else
             path->reserved0 = 0;
             path->reserved1 = 0;
