@@ -473,10 +473,14 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
             XSOCK_WIRE_TCP_RST |
             XSOCK_WIRE_TCP_FIN
         ) ||
-        wire->tcp.flags == (XSOCK_WIRE_TCP_SYN | XSOCK_WIRE_TCP_ACK)
+        wire->tcp.flags == (XSOCK_WIRE_TCP_SYN | XSOCK_WIRE_TCP_ACK) ||
+        (wire->tcp.flags == XSOCK_WIRE_TCP_ACK &&
+            )
         ) {
         // MANDA EM TODOS OS PATHS
-        foreach (pid, XSOCK_PATHS_N) {
+        uint pid = XSOCK_PATHS_N;
+
+        while (pid--) {
             
             const xsock_path_s* const path = &conn->paths[pid];
             
@@ -484,57 +488,58 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
                 path->itfc->flags & IFF_UP) {
                 // TODO: pskb_copy()?
                 sk_buff_s* const skb2 = pid ? skb_copy(skb, GFP_ATOMIC) : skb;
+
                 if (skb2)
                     envia(conn, cid, path, wire, skb2);
             }
         }
-    } else {
-        
-        xsock_path_s* path = conn->path;
 
-        // CHOOSE PATH
-        if (conn->pkts == 0
-         || conn->burst < now
-         || conn->limit < now
-#if XSOCK_SERVER
-         || path->iActive < now
-#endif
-         || path->itfc == NULL
-       || !(path->itfc->flags & IFF_UP)) {
-
-            // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
-            uint c = XSOCK_PATHS_N;
-
-            do { // PATH INUSABLE
-                if (!c--)
-                    // NENHUM PATH DISPONÍVEL
-                    goto drop;
-                // GO TO NEXT PATH
-                path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
-            } while (!(
-                path->oPkts
-#if XSOCK_SERVER
-             && path->iActive >= now
-#endif
-             && path->itfc
-             && path->itfc->flags & IFF_UP
-            ));
-
-            //
-            if (conn->path !=       path) {
-                conn->path  =       path;
-                conn->pkts  =       path->oPkts;
-                conn->limit = now + path->oTime*HZ;
-            }
-        } else
-            conn->pkts--;
-
-        conn->burst = now + path->oBurst;
-
-        envia(conn, cid, path, wire, skb);
+        return;
     }
     
-    //
+    xsock_path_s* path = conn->path;
+
+    // CHOOSE PATH
+    if (conn->pkts == 0
+     || conn->burst < now
+     || conn->limit < now
+#if XSOCK_SERVER
+     || path->iActive < now
+#endif
+     || path->itfc == NULL
+   || !(path->itfc->flags & IFF_UP)) {
+
+        // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
+        uint c = XSOCK_PATHS_N;
+
+        do { // PATH INUSABLE
+            if (!c--)
+                // NENHUM PATH DISPONÍVEL
+                goto drop;
+            // GO TO NEXT PATH
+            path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
+        } while (!(
+            path->oPkts
+#if XSOCK_SERVER
+         && path->iActive >= now
+#endif
+         && path->itfc
+         && path->itfc->flags & IFF_UP
+        ));
+
+        //
+        if (conn->path !=       path) {
+            conn->path  =       path;
+            conn->pkts  =       path->oPkts;
+            conn->limit = now + path->oTime*HZ;
+        }
+    } else
+        conn->pkts--;
+
+    conn->burst = now + path->oBurst;
+
+    envia(conn, cid, path, wire, skb);
+
     return NETDEV_TX_OK;
 
 drop:
