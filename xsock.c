@@ -101,6 +101,26 @@ typedef struct net_device_ops net_device_ops_s;
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
+#ifdef __BIG_ENDIAN
+#define XSOCK_WIRE_TCP_CWR 0b0000000010000000U
+#define XSOCK_WIRE_TCP_ECE 0b0000000001000000U
+#define XSOCK_WIRE_TCP_URG 0b0000000000100000U
+#define XSOCK_WIRE_TCP_ACK 0b0000000000010000U
+#define XSOCK_WIRE_TCP_PSH 0b0000000000001000U
+#define XSOCK_WIRE_TCP_RST 0b0000000000000100U
+#define XSOCK_WIRE_TCP_SYN 0b0000000000000010U
+#define XSOCK_WIRE_TCP_FIN 0b0000000000000001U
+#else
+#define XSOCK_WIRE_TCP_CWR 0b1000000000000000U
+#define XSOCK_WIRE_TCP_ECE 0b0100000000000000U
+#define XSOCK_WIRE_TCP_URG 0b0010000000000000U
+#define XSOCK_WIRE_TCP_ACK 0b0001000000000000U
+#define XSOCK_WIRE_TCP_PSH 0b0000100000000000U
+#define XSOCK_WIRE_TCP_RST 0b0000010000000000U
+#define XSOCK_WIRE_TCP_SYN 0b0000001000000000U
+#define XSOCK_WIRE_TCP_FIN 0b0000000100000000U
+#endif
+
 typedef struct xsock_wire_s {
     u16 _align[5];
     struct xsock_wire_eth_s {
@@ -364,7 +384,7 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
-static void envia (xsock_conn_s* const conn, xsock_path_s* const path, sk_buff_s* const skb) {
+static void envia (const xsock_conn_s* const restrict conn, const uint cid, const xsock_path_s* const restrict path, xsock_wire_s* const restrict wire, sk_buff_s* const restrict skb) {
     
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire)
@@ -449,20 +469,6 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_conn_s* const conn = &conns[cid];
 
     // TODO: SE FOR TCP SYN, SYN-ACK OU ACK, N-PLICAR CÓPIAS EM CADA PATH
-
-#if __BIG_ENDIAN
-#define XSOCK_WIRE_TCP_ACK 0b0000000000010000U
-#define XSOCK_WIRE_TCP_PSH 0b0000000000001000U
-#define XSOCK_WIRE_TCP_RST 0b0000000000000100U
-#define XSOCK_WIRE_TCP_SYN 0b0000000000000010U
-#define XSOCK_WIRE_TCP_FIN 0b0000000000000001U
-#else
-#define XSOCK_WIRE_TCP_ACK 0b0001000000000000U
-#define XSOCK_WIRE_TCP_PSH 0b0000100000000000U
-#define XSOCK_WIRE_TCP_RST 0b0000010000000000U
-#define XSOCK_WIRE_TCP_SYN 0b0000001000000000U
-#define XSOCK_WIRE_TCP_FIN 0b0000000100000000U
-#endif
     if (wire->tcp.flags & (
             XSOCK_WIRE_TCP_RST |
             XSOCK_WIRE_TCP_SYN |
@@ -471,14 +477,14 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         // MANDA EM TODOS OS PATHS
         foreach (pid, XSOCK_PATHS_N) {
             
-            const xsock_path_s* const path = conn->paths[pid];
+            const xsock_path_s* const path = &conn->paths[pid];
             
             if (path->itfc &&
                 path->itfc->flags & IFF_UP) {
                 // TODO: pskb_copy()?
-                sk_buff_s* const skb2 = skb_copy(skb, GFP_ATOMIC);
+                sk_buff_s* const skb2 = pid ? skb_copy(skb, GFP_ATOMIC) : skb;
                 if (skb2)
-                    envia(conn, path, skb2);
+                    envia(conn, cid, path, wire, skb2);
             }
         }
     } else {
@@ -524,7 +530,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
         conn->burst = now + path->oBurst;
 
-        envia(skb, conn, path);
+        envia(conn, cid, path, wire, skb);
     }
     
     //
