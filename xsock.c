@@ -473,7 +473,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
             XSOCK_WIRE_TCP_RST |
             XSOCK_WIRE_TCP_FIN
         ) ||
-        wire->tcp.flags == XSOCK_WIRE_TCP_SYN
+        wire->tcp.flags == (XSOCK_WIRE_TCP_SYN | XSOCK_WIRE_TCP_ACK)
         ) {
         // MANDA EM TODOS OS PATHS
         foreach (pid, XSOCK_PATHS_N) {
