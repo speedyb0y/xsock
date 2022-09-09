@@ -194,8 +194,9 @@ typedef struct xsock_path_s {
 typedef struct xsock_conn_s {
     xsock_path_s* path;
     u64 burst; //
-    u64 pkts;
     u64 limit;
+    u32 pkts;
+    u32 cdown;
     u64 reserved[4];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
@@ -421,6 +422,19 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_path_s* path = conn->path;
 
+    //
+    if (wire->tcp.flags & (
+        XSOCK_WIRE_TCP_RST |
+        XSOCK_WIRE_TCP_SYN |
+        XSOCK_WIRE_TCP_FIN
+    ))
+        conn->cdown = 2*XSOCK_PATHS_N;
+
+    if (conn->cdown) {
+        conn->cdown--;
+        conn->pkts = 0;
+    }
+
     // CHOOSE PATH
     if (conn->pkts == 0
      || conn->burst < now
@@ -459,18 +473,6 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         conn->pkts--;
 
     conn->burst = now + path->oBurst;
-
-    // MANDA ESTE PELO PATH ATUAL, MAS TENTA OUTRO PATH EM SEGUIDA
-    if (wire->tcp.flags & (
-        XSOCK_WIRE_TCP_RST |
-        XSOCK_WIRE_TCP_SYN |
-        XSOCK_WIRE_TCP_FIN
-    ))
-        conn->pkts = 0;
-        //wire->tcp.flags == ( | XSOCK_WIRE_TCP_ACK) ||
-        //(wire->tcp.flags == XSOCK_WIRE_TCP_ACK &&
-            //conn->pkts % 100 == 5)
-        //) {
 
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire)
@@ -628,10 +630,11 @@ static int __init xsock_init (void) {
             printk("XSOCK: CONN %u: INITIALIZING\n", cid);
 
         // INITIALIZE IT
-        conn->path    = &conn->paths[0];
-        conn->pkts    = 0;
+        conn->path    = &conn->paths[0];        
         conn->burst   = 0;
         conn->limit   = 0;
+        conn->pkts    = 0;
+        conn->cdown   = 0;
 
         // INITIALIZE ITS PATHS
         foreach (pid, XSOCK_PATHS_N) {
