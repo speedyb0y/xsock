@@ -337,11 +337,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.dst32       = ADDR_CLT_BE;
 #endif
     wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
-#if XSOCK_SERVER // DEMULTIPLEXA POIS O PID ESTAVA EMBUTIDO NAS PORTAS
-    wire->tcp.dst        = BE16(XSOCK_PORT + cid);
-#else
     wire->tcp.src        = BE16(XSOCK_PORT + cid);
-#endif
+    wire->tcp.dst        = BE16(XSOCK_PORT + cid);
     wire->tcp.seq        = wire->udp.seq;
     wire->tcp.urgent     = 0;
 
@@ -389,14 +386,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.src32   != ADDR_CLT_BE
      || wire->ip.dst32   != ADDR_SRV_BE
 #endif
+     || wire->tcp.src    != wire->tcp.dst
     )
         goto drop;
 
-#if XSOCK_SERVER
-    const uint cid = BE16(wire->tcp.src) - XSOCK_PORT;
-#else
     const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
-#endif
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
@@ -436,12 +430,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         ));
 
         //
-        if (conn->path !=       path) { // ASSERT: (c)
+        if (conn->path !=       path) {
             conn->path  =       path;
             conn->pkts  =       path->oPkts;
             conn->limit = now + path->oTime*HZ;
         }
-
     } else
         conn->pkts--;
 
@@ -457,8 +450,9 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     // RE-ENCAPSULATE
     // MULTIPLEXA ADICIONANDO O PID A PORTA
-#if XSOCK_SERVER
            wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
+#if XSOCK_SERVER
+           wire->udp.dst     = path->cport;
 #else
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
