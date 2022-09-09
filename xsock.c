@@ -207,7 +207,6 @@ typedef struct xsock_cfg_side_s {
     union { u8 addr[4]; u32 addr32; };
     uint port;
     xsock_cfg_path_s paths[XSOCK_PATHS_N];
-    xsock_cfg_path_s paths[XSOCK_PATHS_N];
 } xsock_cfg_side_s;
 
 typedef struct xsock_cfg_conn_s {
@@ -630,11 +629,11 @@ static int __init xsock_init (void) {
             xsock_path_s* const path = &conn->paths[pid];
 
 #if XSOCK_SERVER
-            const xsock_cfg_path_s* const peer = &cfg.clt[pid];
-            const xsock_cfg_path_s* const this = &cfg.srv[pid];
+            const xsock_cfg_path_s* const this = &cfg.srv.paths[pid];
+            const xsock_cfg_path_s* const peer = &cfg.clt.paths[pid];
 #else
-            const xsock_cfg_path_s* const this = &cfg.clt[pid];
-            const xsock_cfg_path_s* const peer = &cfg.srv[pid];
+            const xsock_cfg_path_s* const this = &cfg.clt.paths[pid];
+            const xsock_cfg_path_s* const peer = &cfg.srv.paths[pid];
 #endif
             if (cid == 0 && this->oPkts)
                 printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX PKTS %u MAX TIME %us IN TIMEOUT %us ITFC %s"
