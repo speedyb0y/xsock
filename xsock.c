@@ -408,7 +408,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
      || wire->ip.src32   != ADDR_CLT_BE
      || wire->ip.dst32   != ADDR_SRV_BE
 #endif
-     || wire->tcp.src    != wire->tcp.dst
+     //|| wire->tcp.src    != wire->tcp.dst
     )
         goto drop;
 
@@ -428,8 +428,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         XSOCK_WIRE_TCP_RST |
         XSOCK_WIRE_TCP_SYN |
         XSOCK_WIRE_TCP_FIN
-    ))
+    )) {
+        //conn->reserved2 = wire->tcp.src;
         conn->cdown = 2*XSOCK_PATHS_N;
+    }
 
     if (conn->cdown) {
         conn->cdown--;
@@ -485,8 +487,8 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     // RE-ENCAPSULATE
     // MULTIPLEXA ADICIONANDO O PID A PORTA
-           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
 #if XSOCK_SERVER
+           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
            wire->udp.dst     = path->cport;
 #else
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
