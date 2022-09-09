@@ -471,9 +471,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // TODO: SE FOR TCP SYN, SYN-ACK OU ACK, N-PLICAR CÓPIAS EM CADA PATH
     if (wire->tcp.flags & (
             XSOCK_WIRE_TCP_RST |
-            //XSOCK_WIRE_TCP_SYN |
             XSOCK_WIRE_TCP_FIN
-        )) {
+        ) ||
+        wire->tcp.flags == XSOCK_WIRE_TCP_SYN
+        ) {
         // MANDA EM TODOS OS PATHS
         foreach (pid, XSOCK_PATHS_N) {
             
