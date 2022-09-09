@@ -81,14 +81,6 @@ typedef struct net_device_ops net_device_ops_s;
 #error "BAD XSOCK_PATHS_N"
 #endif
 
-#ifdef __BIG_ENDIAN
-#define ADDR_SRV_BE 0xAC100000U // 172.16.0.0
-#define ADDR_CLT_BE 0xAC100001U // 172.16.0.1
-#else
-#define ADDR_SRV_BE 0x000010ACU // 172.16.0.0
-#define ADDR_CLT_BE 0x010010ACU // 172.16.0.1
-#endif
-
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE CONN AND PATH
 #define PORT(cid, pid) (XSOCK_PORT + (cid)*10 + (pid))
 #define PORT_CID(port) (((port) - XSOCK_PORT) / 10)
@@ -169,14 +161,14 @@ typedef struct xsock_wire_s {
 
 typedef struct xsock_path_s {
     net_device_s* itfc;
+    u16 sport;
+    u16 dport;
 #if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
-    u16 reserved3;
-    u16 cport;
     u32 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
     u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
-    u64 reserved0;
+    u32 reserved0;
     u64 reserved1;
     u64 reserved2;
 #endif
@@ -198,7 +190,11 @@ typedef struct xsock_conn_s {
     u64 limit;
     u32 pkts;
     u32 cdown;
-    u64 reserved[4];
+    u32 laddr;
+    u32 raddr;
+    u32 lport;
+    u32 rport;    
+    u64 reserved[2];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
 
@@ -208,12 +204,17 @@ typedef struct xsock_cfg_path_s {
     uint oTime;
     uint oPkts;
     uint iTimeout;
+    uint port;
     u8   mac[ETH_ALEN];
     u8   gw[ETH_ALEN];
     u8   addr[4];
 } xsock_cfg_path_s;
 
 typedef struct xsock_cfg_conn_s {
+    union { u8 sAddr[4]; u32 sAddr32; };
+    union { u8 cAddr[4]; u32 cAddr32; };    
+    uint cPort;
+    uint sPort;
     xsock_cfg_path_s clt[XSOCK_PATHS_N];
     xsock_cfg_path_s srv[XSOCK_PATHS_N];
 } xsock_cfg_conn_s;
@@ -222,26 +223,28 @@ static net_device_s* xdev;
 static xsock_conn_s conns[XSOCK_CONNS_N];
 
 static const xsock_cfg_conn_s cfg = {
+    .sAddr = {172,16,0,0}, .sPort = 2000,
+    .cAddr = {172,16,0,1}, .cPort = 2000, 
     .clt = {
-        { .oPkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_0_PORT },
 #if XSOCK_PATHS_N > 1
-        { .oPkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_1_PORT, },
 #if XSOCK_PATHS_N > 2
-        { .oPkts = XCONF_XSOCK_CLT_PATH_2_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_2_ITFC, .mac = XCONF_XSOCK_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_CLT_PATH_2_ADDR_0,XCONF_XSOCK_CLT_PATH_2_ADDR_1,XCONF_XSOCK_CLT_PATH_2_ADDR_2,XCONF_XSOCK_CLT_PATH_2_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_2_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_2_ITFC, .mac = XCONF_XSOCK_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_CLT_PATH_2_ADDR_0,XCONF_XSOCK_CLT_PATH_2_ADDR_1,XCONF_XSOCK_CLT_PATH_2_ADDR_2,XCONF_XSOCK_CLT_PATH_2_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_2_PORT, },
 #if XSOCK_PATHS_N > 3
-        { .oPkts = XCONF_XSOCK_CLT_PATH_3_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_3_ITFC, .mac = XCONF_XSOCK_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_CLT_PATH_3_ADDR_0,XCONF_XSOCK_CLT_PATH_3_ADDR_1,XCONF_XSOCK_CLT_PATH_3_ADDR_2,XCONF_XSOCK_CLT_PATH_3_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_3_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_3_ITFC, .mac = XCONF_XSOCK_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_CLT_PATH_3_ADDR_0,XCONF_XSOCK_CLT_PATH_3_ADDR_1,XCONF_XSOCK_CLT_PATH_3_ADDR_2,XCONF_XSOCK_CLT_PATH_3_ADDR_3}, .port = XCONF_XSOCK_CLT_PATH_3_PORT, },
 #endif
 #endif
 #endif
     },
     .srv = {
-        { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, .port = XCONF_XSOCK_SRV_PATH_0_PORT, },
 #if XSOCK_PATHS_N > 1
-        { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, .port = XCONF_XSOCK_SRV_PATH_1_PORT, },
 #if XSOCK_PATHS_N > 2
-        { .oPkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, .port = XCONF_XSOCK_SRV_PATH_2_PORT, },
 #if XSOCK_PATHS_N > 3
-        { .oPkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, .port = XCONF_XSOCK_SRV_PATH_3_PORT, },
 #endif
 #endif
 #endif
@@ -289,8 +292,13 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         return RX_HANDLER_PASS;
 
     // IDENTIFY CONN AND PATH IDS FROM SERVER PORT
-    const uint cid = PORT_CID(BE16(wire->udp.dst));
-    const uint pid = PORT_PID(BE16(wire->udp.dst));
+#if XSOCK_SERVER
+    const uint port = BE16(wire->udp.dst);
+#else
+    const uint port = BE16(wire->udp.src);
+#endif    
+    const uint cid = PORT_CID(port);
+    const uint pid = PORT_PID(port);
 
     // VALIDATE CONN ID
     // VALIDATE PATH ID
@@ -311,10 +319,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT
-    if (BE16(xsock_crypto_decode(payload - 12, size + 12)) != wire->ip.hash) {
-        printk("BAD HASH\n");
+    if (BE16(xsock_crypto_decode(payload - 12, size + 12)) != wire->ip.hash)
         goto drop;
-    }
 
     xsock_conn_s* const conn = &conns[cid];
     
@@ -339,37 +345,28 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
           memcpy(path->mac,      wire->eth.dst, ETH_ALEN);
                  path->saddr32 = wire->ip.dst32;
                  path->daddr32 = wire->ip.src32;
-                 path->cport   = wire->udp.src;
+                 path->sport   = wire->udp.src;
+                 path->dport   = wire->udp.dst;
 
         printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             cid, pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->mac), _IP4(path->saddr), BE16(wire->udp.dst),
-            _MAC(path->gw),  _IP4(path->daddr), BE16(path->cport));
+            _MAC(path->mac), _IP4(path->saddr), BE16(path->sport),
+            _MAC(path->gw),  _IP4(path->daddr), BE16(path->dport));
     }
 #endif
 
     // RE-ENCAPSULATE
-    wire->ip.protocol    = IPPROTO_TCP;
-    wire->ip.cksum       = 0;
-#if XSOCK_SERVER
-    wire->ip.src32       = ADDR_CLT_BE;
-    wire->ip.dst32       = ADDR_SRV_BE;
-#else
-    wire->ip.src32       = ADDR_SRV_BE;
-    wire->ip.dst32       = ADDR_CLT_BE;
-#endif
-    wire->ip.cksum       = ip_fast_csum(PTR(&wire->ip), 5);
-#if XSOCK_SERVER
-    wire->tcp.src        = BE16(XSOCK_PORT + cid);
-    wire->tcp.dst        = BE16(XSOCK_PORT + cid);
-#else
-    wire->tcp.src        = BE16(XSOCK_PORT + cid);
-    wire->tcp.dst        = conn->reserved[0];
-#endif
-    wire->tcp.seq        = wire->udp.seq;
-    wire->tcp.urgent     = 0;
+    wire->ip.protocol = IPPROTO_TCP;
+    wire->ip.cksum    = 0;
+    wire->ip.src32    = conn->raddr;
+    wire->ip.dst32    = conn->laddr;
+    wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
+    wire->tcp.src     = conn->rport;
+    wire->tcp.dst     = conn->lport;
+    wire->tcp.seq     = wire->udp.seq;
+    wire->tcp.urgent  = 0;
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = PTR(&wire->ip);
@@ -395,9 +392,9 @@ drop:
 
 static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
 
-    if (skb->protocol != BE16(ETH_P_IP))
-        goto drop;
-
+    // ASSERT: skb->protocol == BE16(ETH_P_IP)
+    // ASSERT: wire->ip.protocol == IPPROTO_TCP
+     
     if (skb_linearize(skb))
         goto drop;
 
@@ -406,19 +403,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
         + sizeof(wire->tcp)
        - sizeof(*wire);
 
-    if (PTR(&wire->eth) < PTR(skb->head)
-     || wire->ip.protocol != IPPROTO_TCP
-#if XSOCK_SERVER
-     || wire->ip.src32   != ADDR_SRV_BE
-     || wire->ip.dst32   != ADDR_CLT_BE
-#else
-     || wire->ip.src32   != ADDR_CLT_BE
-     || wire->ip.dst32   != ADDR_SRV_BE
-#endif
-     //|| wire->tcp.src    != wire->tcp.dst
-    )
+    if (PTR(&wire->eth) < PTR(skb->head))
         goto drop;
 
+    // IDENTIFY CONN AND PATH IDS FROM PACKET MARK
     const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
 
     if (cid >= XSOCK_CONNS_N)
@@ -428,22 +416,30 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
 
     xsock_conn_s* const conn = &conns[cid];
 
-    xsock_path_s* path = conn->path;
+    //
+    if ((wire->tcp.flags & (
+        XSOCK_WIRE_TCP_SYN
+      | XSOCK_WIRE_TCP_ACK))
+     == XSOCK_WIRE_TCP_SYN) {
+        conn->laddr = wire->ip.src32;
+        conn->raddr = wire->ip.dst32;
+        conn->lport = wire->tcp.src;
+        conn->rport = wire->tcp.dst;
+    }
 
     //
     if (wire->tcp.flags & (
         XSOCK_WIRE_TCP_RST |
         XSOCK_WIRE_TCP_SYN |
-        XSOCK_WIRE_TCP_FIN
-    )) {
-        conn->reserved[0] = wire->tcp.src;
+        XSOCK_WIRE_TCP_FIN))
         conn->cdown = 2*XSOCK_PATHS_N;
-    }
 
     if (conn->cdown) {
         conn->cdown--;
         conn->pkts = 0;
     }
+
+    xsock_path_s* path = conn->path;
 
     // CHOOSE PATH
     if (conn->pkts == 0
@@ -496,11 +492,10 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // MULTIPLEXA ADICIONANDO O PID A PORTA
 #if XSOCK_SERVER
            wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
-           wire->udp.dst     = path->cport;
+           wire->udp.dst     = path->dport;
 #else
-            //conn->reserved2 = wire->tcp.src;
-           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
-           wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
+           wire->udp.src     = path->sport;
+           wire->udp.dst     = path->dport;
 #endif
     // ARRASTA ANTES DE SOBRESCREVER (NOTE: ASSUME QUE URGENT É 0)
            wire->udp.seq     = wire->tcp.seq;
@@ -531,7 +526,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
     // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
     dev_queue_xmit(skb);
-    //
+
     return NETDEV_TX_OK;
 
 drop:
@@ -647,6 +642,17 @@ static int __init xsock_init (void) {
         conn->limit   = 0;
         conn->pkts    = 0;
         conn->cdown   = 0;
+#if XSOCK_SERVER
+        conn->laddr   =      cfg.sAddr32;
+        conn->raddr   =      cfg.cAddr32;
+        conn->lport   = BE16(cfg.sPort);
+        conn->rport   = BE16(cfg.cPort + cid);
+#else // PREENCHIDO PELA APLICACAO/ROTEAMENTO
+        conn->laddr   = 0;
+        conn->raddr   = 0;
+        conn->lport   = 0;
+        conn->rport   = 0;
+#endif
 
         // INITIALIZE ITS PATHS
         foreach (pid, XSOCK_PATHS_N) {
@@ -662,38 +668,37 @@ static int __init xsock_init (void) {
 #endif
             if (cid == 0 && this->oPkts)
                 printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX PKTS %u MAX TIME %us IN TIMEOUT %us ITFC %s"
-                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
-                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
+                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
+                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
                     cid, pid,
                     this->oBurst,
                     this->oPkts,
                     this->oTime,
                     this->iTimeout,
                     this->itfc,
-                    _MAC(this->mac), _IP4(this->addr),
-                    _MAC(this->gw),  _IP4(peer->addr)
+                    _MAC(this->mac), _IP4(this->addr), this->port,
+                    _MAC(this->gw),  _IP4(peer->addr), peer->port
                 );
 
-            memcpy(path->mac,  this->mac, ETH_ALEN);
-            memcpy(path->gw,   this->gw,  ETH_ALEN);
-            memcpy(path->saddr, this->addr, 4);
-            memcpy(path->daddr, peer->addr, 4);
-
             path->itfc      =  NULL;
+            path->oPkts     = this->oPkts;
+            path->oBurst    = this->oBurst;
+            path->oTime     = this->oTime;
 #if XSOCK_SERVER
             path->iHash     = 0;
             path->iActive   = 0;
             path->iTimeout  = this->iTimeout;
-            path->cport     = 0;
-            path->reserved3 = 0;
 #else
             path->reserved0 = 0;
             path->reserved1 = 0;
             path->reserved2 = 0;
 #endif
-            path->oPkts     = this->oPkts;
-            path->oBurst    = this->oBurst;
-            path->oTime     = this->oTime;
+     memcpy(path->mac,        this->mac, ETH_ALEN);
+     memcpy(path->gw,         this->gw,  ETH_ALEN);
+     memcpy(path->saddr,      this->addr, 4);
+     memcpy(path->daddr,      peer->addr, 4);
+            path->sport     = BE16(this->port);
+            path->dport     = BE16(peer->port);
 
             net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
