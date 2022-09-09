@@ -350,15 +350,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
+    wire->tcp.src     = conn->rport;
+    wire->tcp.dst     = conn->lport;
+    wire->tcp.seq     = wire->udp.seq;
+    wire->tcp.urgent  = 0;
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.cksum    = 0;
     wire->ip.src32    = conn->raddr;
     wire->ip.dst32    = conn->laddr;
     wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
-    wire->tcp.src     = conn->rport;
-    wire->tcp.dst     = conn->lport;
-    wire->tcp.seq     = wire->udp.seq;
-    wire->tcp.urgent  = 0;
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = PTR(&wire->ip);
