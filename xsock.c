@@ -65,13 +65,8 @@ typedef struct net_device_ops net_device_ops_s;
 #define _IP4(x) __A4(x)
 
 #define XSOCK_SERVER   XCONF_XSOCK_SERVER_IS
-#define XSOCK_PORT     XCONF_XSOCK_PORT
 #define XSOCK_CONNS_N  XCONF_XSOCK_CONNS_N
 #define XSOCK_PATHS_N  XCONF_XSOCK_PATHS_N
-
-#if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
-#error "BAD XSOCK_PORT"
-#endif
 
 #if ! (1 <= XSOCK_CONNS_N && XSOCK_CONNS_N <= 0xFFFF)
 #error "BAD XSOCK_CONNS_N"
@@ -81,14 +76,16 @@ typedef struct net_device_ops net_device_ops_s;
 #error "BAD XSOCK_PATHS_N"
 #endif
 
-// THE ON-WIRE SERVER PORT WILL DETERMINE THE CONN AND PATH
-#define PORT(cid, pid) (XSOCK_PORT + (cid)*10 + (pid))
-#define PORT_CID(port) (((port) - XSOCK_PORT) / 10)
-#define PORT_PID(port) (((port) - XSOCK_PORT) % 10)
-
-#if PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
-#error "BAD XSOCK_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
+#if XSOCK_SERVER
+#define pathSrvPort path->sport
+#else
+#define pathSrvPort path->dport
 #endif
+
+// THE ON-WIRE SERVER PORT WILL DETERMINE THE CONN AND PATH
+#define PORT(cid, pid) (pathSrvPort + (cid)*10 + (pid))
+#define PORT_CID(port) (((port) - pathSrvPort) / 10)
+#define PORT_PID(port) (((port) - pathSrvPort) % 10)
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
