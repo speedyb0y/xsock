@@ -17,12 +17,6 @@
 #include <net/addrconf.h>
 #include <linux/module.h>
 
-#if XCONF_XSOCK_ASSERT
-#define XSOCK_ASSERT(c) ({ if (!(c)) printk("ASSERT FAILED: " #c "\n"); })
-#else
-#define XSOCK_ASSERT(c) ({})
-#endif
-
 typedef __u8  u8;
 typedef __u16 u16;
 typedef __u32 u32;
