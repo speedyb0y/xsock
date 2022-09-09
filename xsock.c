@@ -183,12 +183,11 @@ typedef struct xsock_conn_s {
     u64 burst; //
     u64 limit;
     u32 pkts;
-    u32 cdown;
     u32 laddr;
     u32 raddr;
-    u32 lport;
-    u32 rport;    
-    u64 reserved[2];
+    u16 lport;
+    u16 rport;    
+    u64 reserved[3];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
 
@@ -384,7 +383,7 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
-static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* const dev) {
+static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // ASSERT: skb->protocol == BE16(ETH_P_IP)
     // ASSERT: wire->ip.protocol == IPPROTO_TCP
@@ -411,25 +410,11 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     xsock_conn_s* const conn = &conns[cid];
 
     //
-    if ((wire->tcp.flags & (
-        XSOCK_WIRE_TCP_SYN
-      | XSOCK_WIRE_TCP_ACK))
-     == XSOCK_WIRE_TCP_SYN) {
+    if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN) {
         conn->laddr = wire->ip.src32;
         conn->raddr = wire->ip.dst32;
         conn->lport = wire->tcp.src;
         conn->rport = wire->tcp.dst;
-    }
-
-    //
-    if (wire->tcp.flags & (
-        XSOCK_WIRE_TCP_RST |
-        XSOCK_WIRE_TCP_SYN |
-        XSOCK_WIRE_TCP_FIN))
-        conn->cdown = 2*XSOCK_PATHS_N;
-
-    if (conn->cdown) {
-        conn->cdown--;
         conn->pkts = 0;
     }
 
@@ -531,42 +516,33 @@ drop:
     return NETDEV_TX_OK;
 }
 
-static int xsock_dev_up (net_device_s* const dev) {
+static int xsock_up (net_device_s* const dev) {
 
     printk("XSOCK: UP\n");
 
     return 0;
 }
 
-static int xsock_dev_down (net_device_s* const dev) {
+static int xsock_down (net_device_s* const dev) {
 
     printk("XSOCK: DOWN\n");
 
     return 0;
 }
 
-static int xsock_dev_header_create (sk_buff_s *skb, net_device_s *dev, unsigned short type, const void *dst, const void *src, uint len) {
-
-    return 0;
-}
-
-static const header_ops_s xsockHeaderOps = {
-    .create = xsock_dev_header_create,
-};
-
 static const net_device_ops_s xsockDevOps = {
     .ndo_init             =  NULL,
-    .ndo_open             =  xsock_dev_up,
-    .ndo_stop             =  xsock_dev_down,
-    .ndo_start_xmit       =  xsock_dev_start_xmit,
+    .ndo_open             =  xsock_up,
+    .ndo_stop             =  xsock_down,
+    .ndo_start_xmit       =  xsock_out,
     .ndo_set_mac_address  =  NULL,
     // TODO: SET MTU - NAO EH PARA SETAR AQUI E SIM NO ROUTE
 };
 
-static void xsock_dev_setup (net_device_s* const dev) {
+static void xsock_setup (net_device_s* const dev) {
 
     dev->netdev_ops      = &xsockDevOps;
-    dev->header_ops      = &xsockHeaderOps;
+    dev->header_ops      = NULL;
     dev->type            = ARPHRD_NONE;
     dev->addr_len        = 0;
     dev->hard_header_len = ETH_HLEN;
@@ -606,7 +582,7 @@ static int __init xsock_init (void) {
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
 
     // CREATE THE VIRTUAL INTERFACE
-    net_device_s* const dev = alloc_netdev(0, "xsock", NET_NAME_USER, xsock_dev_setup);
+    net_device_s* const dev = alloc_netdev(0, "xsock", NET_NAME_USER, xsock_setup);
 
     if (!dev) {
         printk("XSOCK: CREATE FAILED - COULD NOT ALLOCATE\n");
@@ -635,7 +611,6 @@ static int __init xsock_init (void) {
         conn->burst   = 0;
         conn->limit   = 0;
         conn->pkts    = 0;
-        conn->cdown   = 0;
 #if XSOCK_SERVER
         conn->laddr   =      cfg.sAddr32;
         conn->raddr   =      cfg.cAddr32;
