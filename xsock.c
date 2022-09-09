@@ -186,7 +186,7 @@ typedef struct xsock_conn_s {
     u32 laddr;
     u32 raddr;
     u16 lport;
-    u16 rport;    
+    u16 rport;
     u64 reserved[3];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
@@ -244,7 +244,7 @@ static const xsock_cfg_conn_s cfg = {
     }}
 };
 
-static uint xsock_crypto_encode (void* data, uint size) {
+static uint xsock_out_encrypt (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -252,7 +252,7 @@ static uint xsock_crypto_encode (void* data, uint size) {
     return size;
 }
 
-static uint xsock_crypto_decode (void* data, uint size) {
+static uint xsock_in_decrypt (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -289,7 +289,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint port = BE16(wire->udp.dst);
 #else
     const uint port = BE16(wire->udp.src);
-#endif    
+#endif
     const uint cid = PORT_CID(port);
     const uint pid = PORT_PID(port);
 
@@ -311,12 +311,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if ((payload + size) > SKB_TAIL(skb))
         goto drop;
 
-    // DECRYPT
-    if (BE16(xsock_crypto_decode(payload - 12, size + 12)) != wire->ip.hash)
+    // DECRYPT AND CONFIRM AUTHENTICITY
+    if (BE16(xsock_in_decrypt(payload - 12, size + 12)) != wire->ip.hash)
         goto drop;
 
     xsock_conn_s* const conn = &conns[cid];
-    
+
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
 #if XSOCK_SERVER
     // NOTE: O SERVER NÃO PODE RECEBER ALEATORIAMENTE COM  UM MESMO IP EM MAIS DE UMA INTERACE, SENÃO VAI FICAR TROCANDO TODA HORA AQUI
@@ -329,7 +329,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     xsock_path_s* const path = &conn->paths[pid];
 
-    // TODO: FIXME: MAS VAI TER QUE VALIDAR QUE REALMENTE É OFICIAL :S
                  path->iActive = jiffies + path->iTimeout*HZ;
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
@@ -387,7 +386,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // ASSERT: skb->protocol == BE16(ETH_P_IP)
     // ASSERT: wire->ip.protocol == IPPROTO_TCP
-     
+
     if (skb_linearize(skb))
         goto drop;
 
@@ -481,7 +480,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
     // ENCRYPT EVERYTHING AFTER THE UDP HEADER
-           wire->ip.hash     = BE16(xsock_crypto_encode(payload - 12, size + 12));
+           wire->ip.hash     = BE16(xsock_out_encrypt(payload - 12, size + 12));
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.src32    = path->saddr32;
@@ -607,7 +606,7 @@ static int __init xsock_init (void) {
             printk("XSOCK: CONN %u: INITIALIZING\n", cid);
 
         // INITIALIZE IT
-        conn->path    = &conn->paths[0];        
+        conn->path    = &conn->paths[0];
         conn->burst   = 0;
         conn->limit   = 0;
         conn->pkts    = 0;
