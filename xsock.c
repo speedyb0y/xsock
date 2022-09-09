@@ -471,7 +471,7 @@ static netdev_tx_t xsock_dev_start_xmit (sk_buff_s* const skb, net_device_s* con
     // TODO: SE FOR TCP SYN, SYN-ACK OU ACK, N-PLICAR CÓPIAS EM CADA PATH
     if (wire->tcp.flags & (
             XSOCK_WIRE_TCP_RST |
-            XSOCK_WIRE_TCP_SYN |
+            //XSOCK_WIRE_TCP_SYN |
             XSOCK_WIRE_TCP_FIN
         )) {
         // MANDA EM TODOS OS PATHS
@@ -576,6 +576,7 @@ static const net_device_ops_s xsockDevOps = {
     // TODO: SET MTU - NAO EH PARA SETAR AQUI E SIM NO ROUTE
 };
 
+// TODO: FIXME: If the driver features set includes both NETIF_F_HW_CSUM and NETIF_F_IP_CSUM features, then you will get a kernel message saying "mixed HW and IP checksum settings." In such a case, the netdev_fix_features() method removes the NETIF_F_IP_CSUM feature.
 static void xsock_dev_setup (net_device_s* const dev) {
 
     dev->netdev_ops      = &xsockDevOps;
