@@ -205,7 +205,7 @@ typedef struct xsock_cfg_path_s {
 
 typedef struct xsock_cfg_side_s {
     union { u8 addr[4]; u32 addr32; };
-    uint port;
+    uint port; // NO CLIENTE, É ISSO + CID, PARA NÃO COLIDIR COM OUTROS SOCKETS
     xsock_cfg_path_s paths[XSOCK_PATHS_N];
 } xsock_cfg_side_s;
 
