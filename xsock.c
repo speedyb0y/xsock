@@ -468,13 +468,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // RE-ENCAPSULATE
     // MULTIPLEXA ADICIONANDO O PID A PORTA
-#if XSOCK_SERVER
-           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
-           wire->udp.dst     = path->dport;
-#else
            wire->udp.src     = path->sport;
            wire->udp.dst     = path->dport;
-#endif
     // ARRASTA ANTES DE SOBRESCREVER (NOTE: ASSUME QUE URGENT É 0)
            wire->udp.seq     = wire->tcp.seq;
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
