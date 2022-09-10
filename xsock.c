@@ -412,12 +412,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_conn_s* const conn = &conns[cid];
 
+    const xsock_path_s* path = conn->path;
+
     // IF THIS IS THE SYN OR SYN-ACK PACKET,
     // WE NOW DEFINE THE VIRTUAL ADDRESSES
     if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN)
         conn->pkts = 0;
-
-    xsock_path_s* path = conn->path;
 
     // CHOOSE PATH
     if (conn->pkts == 0
