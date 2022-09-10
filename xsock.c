@@ -387,7 +387,7 @@ drop:
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // IDENTIFY CONN FROM PACKET MARK
-    const uint cid = skb->mark - XSOCK_MARK;
+    const uint cid = (uint)skb->mark - XSOCK_MARK;
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
@@ -407,7 +407,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_conn_s* const conn = &conns[cid];
 
-    //
+    // IF THIS IS THE SYN OR SYN-ACK PACKET,
+    // WE NOW DEFINE THE VIRTUAL ADDRESSES
     if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN) {
         conn->laddr = wire->ip.src32;
         conn->raddr = wire->ip.dst32;
