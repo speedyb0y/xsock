@@ -187,7 +187,7 @@ typedef struct xsock_path_s {
 #define XSOCK_CONN_SIZE (CACHE_LINE_SIZE + XSOCK_PATHS_N*XSOCK_PATH_SIZE)
 
 typedef struct xsock_conn_s {
-    xsock_path_s* path;
+    const xsock_path_s* path;
     u64 burst; //
     u64 limit;
     u64 pkts;
