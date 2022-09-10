@@ -338,8 +338,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
           memcpy(path->mac,      wire->eth.dst, ETH_ALEN);
                  path->saddr32 = wire->ip.dst32;
                  path->daddr32 = wire->ip.src32;
-                 path->sport   = wire->udp.src;
-                 path->dport   = wire->udp.dst;
+                 path->sport   = wire->udp.dst;
+                 path->dport   = wire->udp.src;
 
         printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
@@ -373,7 +373,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->csum_valid = 1;
     skb->dev = xdev;
     skb->mark = XSOCK_MARK + cid;
-    
+
     return RX_HANDLER_ANOTHER;
 
 drop:
@@ -467,12 +467,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                   - sizeof(wire->tcp);
 
     // RE-ENCAPSULATE
-           wire->udp.src     = path->sport;
-           wire->udp.dst     = path->dport;
            wire->udp.seq     = wire->tcp.seq;
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
            wire->ip.hash     = BE16(xsock_out_encrypt(payload - 12, size + 12));
+           wire->udp.src     = path->sport;
+           wire->udp.dst     = path->dport;
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
            wire->ip.protocol = IPPROTO_UDP;
