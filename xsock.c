@@ -403,7 +403,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (PTR(&wire->eth) < PTR(skb->head))
         goto drop;
 
-
     const u64 now = jiffies;
 
     xsock_conn_s* const conn = &conns[cid];
