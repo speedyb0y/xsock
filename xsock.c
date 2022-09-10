@@ -285,7 +285,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
      || wire->ip.protocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
 
-    // IDENTIFY CONN AND PATH IDS FROM SERVER PORT
+    // IDENTIFY CONN AND PATH FROM SERVER PORT
 #if XSOCK_SERVER
     const uint port = BE16(wire->udp.dst);
 #else
@@ -399,13 +399,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (PTR(&wire->eth) < PTR(skb->head))
         goto drop;
 
-#if XSOCK_MARK
-    // IDENTIFY CONN AND PATH IDS FROM SERVER PORT
-    const uint cid = BE16(wire->tcp.src) - XSOCK_SERVER_PORT;
-#else
-    // IDENTIFY CONN AND PATH IDS FROM PACKET MARK
+    // IDENTIFY CONN FROM PACKET MARK
     const uint cid = skb->mark - XSOCK_MARK;
-#endif
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
