@@ -358,7 +358,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.dst32    = ADDR_SRV_BE;
 #else
     wire->tcp.src     = BE16(XSOCK_PORT);
-    wire->tcp.dst     = BE16(XSOCK_PORT + cid);
+ // wire->tcp.dst
     wire->ip.src32    = ADDR_SRV_BE;
     wire->ip.dst32    = ADDR_CLT_BE;
 #endif
@@ -471,10 +471,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
            wire->ip.hash     = BE16(xsock_out_encrypt(payload - 12, size + 12));
-           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
 #if XSOCK_SERVER // THE CLIENT IS BEHIND NAT
+           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
            wire->udp.dst     = path->cport;
 #else
+        // wire->udp.src
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
            wire->ip.src32    = path->saddr32;
