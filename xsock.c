@@ -351,12 +351,14 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
-    wire->tcp.src     = BE16(XSOCK_PORT + cid);
-    wire->tcp.dst     = BE16(XSOCK_PORT + cid);
 #if XSOCK_SERVER
+    wire->tcp.src     = BE16(XSOCK_PORT + cid);
+    wire->tcp.dst     = BE16(XSOCK_PORT);
     wire->ip.src32    = ADDR_CLT_BE;
     wire->ip.dst32    = ADDR_SRV_BE;
 #else
+    wire->tcp.src     = BE16(XSOCK_PORT);
+    wire->tcp.dst     = BE16(XSOCK_PORT + cid);
     wire->ip.src32    = ADDR_SRV_BE;
     wire->ip.dst32    = ADDR_CLT_BE;
 #endif
