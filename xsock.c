@@ -191,7 +191,8 @@ typedef struct xsock_conn_s {
     const xsock_path_s* path;
     u64 burst; //
     u64 limit;
-    u64 pkts;
+    u32 pkts;
+    u32 cdown;
     u64 reserved[4];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
@@ -222,25 +223,25 @@ static xsock_conn_s conns[XSOCK_CONNS_N];
 
 static const xsock_cfg_conn_s cfg = {
     .clt = { .paths = {
-        { .oPkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .oBurst = HZ/5, .oTime = 10,               .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, },
 #if XSOCK_PATHS_N > 1
-        { .oPkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .oBurst = HZ/5, .oTime = 10,               .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, },
 #if XSOCK_PATHS_N > 2
-        { .oPkts = XCONF_XSOCK_CLT_PATH_2_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_2_ITFC, .mac = XCONF_XSOCK_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_CLT_PATH_2_ADDR_0,XCONF_XSOCK_CLT_PATH_2_ADDR_1,XCONF_XSOCK_CLT_PATH_2_ADDR_2,XCONF_XSOCK_CLT_PATH_2_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_2_PKTS, .oBurst = HZ/5, .oTime = 10,               .itfc = XCONF_XSOCK_CLT_PATH_2_ITFC, .mac = XCONF_XSOCK_CLT_PATH_2_MAC, .gw = XCONF_XSOCK_CLT_PATH_2_GW, .addr = {XCONF_XSOCK_CLT_PATH_2_ADDR_0,XCONF_XSOCK_CLT_PATH_2_ADDR_1,XCONF_XSOCK_CLT_PATH_2_ADDR_2,XCONF_XSOCK_CLT_PATH_2_ADDR_3}, },
 #if XSOCK_PATHS_N > 3
-        { .oPkts = XCONF_XSOCK_CLT_PATH_3_PKTS, .oBurst = HZ/4, .oTime = 12,               .itfc = XCONF_XSOCK_CLT_PATH_3_ITFC, .mac = XCONF_XSOCK_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_CLT_PATH_3_ADDR_0,XCONF_XSOCK_CLT_PATH_3_ADDR_1,XCONF_XSOCK_CLT_PATH_3_ADDR_2,XCONF_XSOCK_CLT_PATH_3_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_CLT_PATH_3_PKTS, .oBurst = HZ/5, .oTime = 10,               .itfc = XCONF_XSOCK_CLT_PATH_3_ITFC, .mac = XCONF_XSOCK_CLT_PATH_3_MAC, .gw = XCONF_XSOCK_CLT_PATH_3_GW, .addr = {XCONF_XSOCK_CLT_PATH_3_ADDR_0,XCONF_XSOCK_CLT_PATH_3_ADDR_1,XCONF_XSOCK_CLT_PATH_3_ADDR_2,XCONF_XSOCK_CLT_PATH_3_ADDR_3}, },
 #endif
 #endif
 #endif
     }},
     .srv = { .paths = {
-        { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/5, .oTime = 10, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, },
 #if XSOCK_PATHS_N > 1
-        { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/5, .oTime = 10, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, },
 #if XSOCK_PATHS_N > 2
-        { .oPkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_2_PKTS, .oBurst = HZ/5, .oTime = 10, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_2_ITFC, .mac = XCONF_XSOCK_SRV_PATH_2_MAC, .gw = XCONF_XSOCK_SRV_PATH_2_GW, .addr = {XCONF_XSOCK_SRV_PATH_2_ADDR_0,XCONF_XSOCK_SRV_PATH_2_ADDR_1,XCONF_XSOCK_SRV_PATH_2_ADDR_2,XCONF_XSOCK_SRV_PATH_2_ADDR_3}, },
 #if XSOCK_PATHS_N > 3
-        { .oPkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .oBurst = HZ/4, .oTime = 12, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, },
+        { .oPkts = XCONF_XSOCK_SRV_PATH_3_PKTS, .oBurst = HZ/5, .oTime = 10, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_3_ITFC, .mac = XCONF_XSOCK_SRV_PATH_3_MAC, .gw = XCONF_XSOCK_SRV_PATH_3_GW, .addr = {XCONF_XSOCK_SRV_PATH_3_ADDR_0,XCONF_XSOCK_SRV_PATH_3_ADDR_1,XCONF_XSOCK_SRV_PATH_3_ADDR_2,XCONF_XSOCK_SRV_PATH_3_ADDR_3}, },
 #endif
 #endif
 #endif
@@ -411,6 +412,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (PTR(&wire->eth) < PTR(skb->head))
         goto drop;
 
+#if 1
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
@@ -432,6 +434,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
+#endif
 
     const u64 now = jiffies;
 
@@ -439,11 +442,19 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     const xsock_path_s* path = conn->path;
 
-    // IF THIS IS THE SYN OR SYN-ACK PACKET,
-    // WE NOW DEFINE THE VIRTUAL ADDRESSES
-    if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN)
-        conn->pkts = 0;
+    //
+    if (wire->tcp.flags & (
+        XSOCK_WIRE_TCP_SYN |
+        XSOCK_WIRE_TCP_RST |
+        XSOCK_WIRE_TCP_FIN
+    ))
+        conn->cdown = 2*XSOCK_PATHS_N;
 
+    if (conn->cdown) {
+        conn->cdown--;
+        conn->pkts = 0;
+    }
+    
     // CHOOSE PATH
     if (conn->pkts == 0
      || conn->burst < now
@@ -629,6 +640,7 @@ static int __init xsock_init (void) {
         conn->burst  = 0;
         conn->limit  = 0;
         conn->pkts   = 0;
+        conn->cdown  = 0;
 
         // INITIALIZE ITS PATHS
         foreach (pid, XSOCK_PATHS_N) {
