@@ -365,14 +365,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->data            = PTR(&wire->ip);
     skb->mac_header      = PTR(&wire->ip) - PTR(skb->head);
     skb->network_header  = PTR(&wire->ip) - PTR(skb->head);
-    skb->len       = sizeof(wire->ip)
-                   + sizeof(wire->tcp)
-                   + size;
-    skb->mac_len   = 0;
-    skb->dev       = xdev;
-    skb->ip_summed = CHECKSUM_UNNECESSARY; //;
+    skb->len = sizeof(wire->ip)
+             + sizeof(wire->tcp)
+             + size;
+    skb->mac_len = 0;
+    skb->ip_summed = CHECKSUM_UNNECESSARY;
     skb->csum_valid = 1;
-
+    skb->dev = xdev;
+    skb->mark = XSOCK_MARK + cid;
+    
     return RX_HANDLER_ANOTHER;
 
 drop:
