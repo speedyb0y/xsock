@@ -492,7 +492,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->transport_header = PTR(&wire->udp) - PTR(skb->head);
     skb->len              = sizeof(*wire) - sizeof(wire->_align) + size;
     skb->mac_len          = ETH_HLEN;
-    skb->ip_summed        = CHECKSUM_NONE; // CHECKSUM_UNNECESSARY?
+    skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
 
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
