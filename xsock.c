@@ -386,8 +386,11 @@ drop:
 
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
-    // ASSERT: skb->protocol == BE16(ETH_P_IP)
-    // ASSERT: wire->ip.protocol == IPPROTO_TCP
+    // IDENTIFY CONN FROM PACKET MARK
+    const uint cid = skb->mark - XSOCK_MARK;
+
+    if (cid >= XSOCK_CONNS_N)
+        goto drop;
 
     if (skb_linearize(skb))
         goto drop;
@@ -400,11 +403,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (PTR(&wire->eth) < PTR(skb->head))
         goto drop;
 
-    // IDENTIFY CONN FROM PACKET MARK
-    const uint cid = skb->mark - XSOCK_MARK;
-
-    if (cid >= XSOCK_CONNS_N)
-        goto drop;
 
     const u64 now = jiffies;
 
