@@ -467,20 +467,16 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                   - sizeof(wire->tcp);
 
     // RE-ENCAPSULATE
-    // MULTIPLEXA ADICIONANDO O PID A PORTA
            wire->udp.src     = path->sport;
            wire->udp.dst     = path->dport;
-    // ARRASTA ANTES DE SOBRESCREVER (NOTE: ASSUME QUE URGENT É 0)
            wire->udp.seq     = wire->tcp.seq;
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
-    // ENCRYPT EVERYTHING AFTER THE UDP HEADER
            wire->ip.hash     = BE16(xsock_out_encrypt(payload - 12, size + 12));
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
-    // COMPUTE AND SET IP CHECKSUM
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
     memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
     memcpy(wire->eth.src,      path->mac, ETH_ALEN);
