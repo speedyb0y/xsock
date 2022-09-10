@@ -5,10 +5,10 @@
 #define XCONF_XSOCK_CONNS_N 1024
 #define XCONF_XSOCK_PATHS_N 3
 
-#define VPS_A 216
-#define VPS_B 238
-#define VPS_C 100
-#define VPS_D 32
+#define VPS_A 144
+#define VPS_B 202
+#define VPS_C 41
+#define VPS_D 86
 
 #define XCONF_XSOCK_CLT_PATH_0_PKTS 500000
 #define XCONF_XSOCK_CLT_PATH_1_PKTS 500000

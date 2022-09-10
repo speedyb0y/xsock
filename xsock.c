@@ -1,5 +1,6 @@
 /*
 
+    TODO: mixed HW and IP checksum settings.
     TODO: NO CLIENTE, VAI TER QUE ALTERAR A PORTA DE TEMPOS EM TEMPOS SE NAO ESTIVER FUNCIONANDO
 */
 
@@ -391,11 +392,13 @@ drop:
 
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
+#if 0
     // IDENTIFY CONN FROM PACKET MARK
     const uint cid = (uint)skb->mark - XSOCK_MARK;
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
+#endif
 
     if (skb_linearize(skb))
         goto drop;
@@ -406,6 +409,28 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
        - sizeof(*wire);
 
     if (PTR(&wire->eth) < PTR(skb->head))
+        goto drop;
+
+    if (PTR(&wire->eth) < PTR(skb->head)
+     || wire->ip.protocol != IPPROTO_TCP
+#if XSOCK_SERVER
+     || wire->ip.src32   != ADDR_SRV_BE
+     || wire->ip.dst32   != ADDR_CLT_BE
+#else
+     || wire->ip.src32   != ADDR_CLT_BE
+     || wire->ip.dst32   != ADDR_SRV_BE
+#endif
+     //|| wire->tcp.src    != wire->tcp.dst
+    )
+        goto drop;
+
+#if XSOCK_SERVER
+    const uint cid = BE16(wire->tcp.src) - XSOCK_PORT;
+#else
+    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
+#endif
+
+    if (cid >= XSOCK_CONNS_N)
         goto drop;
 
     const u64 now = jiffies;
@@ -504,8 +529,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     return NETDEV_TX_OK;
 
 drop:
-    printk("DROP!\n");
-
     dev_kfree_skb(skb);
 
     return NETDEV_TX_OK;
