@@ -6,9 +6,9 @@ ISP_MTU=1472
 
 echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
-echo  300 > /proc/sys/net/ipv4/tcp_reordering
-
- echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
+echo 300 > /proc/sys/net/ipv4/tcp_reordering
+echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
+echo 1 > /proc/sys/net/ipv4/tcp_fwmark_accept
 
 ip link set dev xsock up
 

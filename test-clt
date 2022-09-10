@@ -6,31 +6,8 @@ TABLE_XSOCK=5
 
 echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
-echo  300 > /proc/sys/net/ipv4/tcp_reordering
-
-
-###
-for ITFC in eth0 enp1s0 enp6s0 enp5s0 ; do
-    ethtool --offload ${ITFC} rx off
-    ethtool --offload ${ITFC} tx off
-    ethtool --offload ${ITFC} tx-checksum-ip-generic off
-    ethtool --offload ${ITFC} tx-checksum-ipv4 off
-    ethtool --offload ${ITFC} tx-checksum-ipv6 off
-    ethtool --offload ${ITFC} rx-vlan-offload off
-    ethtool --offload ${ITFC} tx-vlan-offload off
-    ethtool --offload ${ITFC} generic-segmentation-offload off
-    ethtool --offload ${ITFC} generic-receive-offload off
-    ethtool --offload ${ITFC} tcp-segmentation-offload off
-    ethtool --offload ${ITFC} tx-tcp-segmentation off
-    ethtool --offload ${ITFC} tx-tcp6-segmentation off
-    ethtool --pause ${ITFC} autoneg off
-    ethtool --pause ${ITFC} rx off
-    ethtool --pause ${ITFC} tx off
-done
-###
-
-echo 1 > /proc/sys/net/ipv6/conf/enp5s0/disable_ipv6
-echo 1 > /proc/sys/net/ipv6/conf/enp6s0/disable_ipv6
+echo 300 > /proc/sys/net/ipv4/tcp_reordering
+echo 1 > /proc/sys/net/ipv4/tcp_fwmark_accept
 echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
 
 ip link set dev xsock up
