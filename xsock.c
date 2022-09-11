@@ -64,7 +64,7 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_MARK        XCONF_XSOCK_MARK
 #define XSOCK_HOSTS_N     XCONF_XSOCK_HOSTS_N
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
-#define XSOCK_HOST_ID     XSOCK_HOST_ID
+#define XSOCK_HOST_ID     XCONF_XSOCK_HOST_ID
 
 #if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
 #error "BAD XSOCK_PORT"
@@ -623,10 +623,13 @@ static int __init xsock_init (void) {
     xdev = dev;
 
     // INITIALIZE HOSTS
+#if XSOCK_SERVER
     foreach (hid, XSOCK_HOSTS_N) {
 
         xsock_host_s* const host = &hosts[hid];
-
+#else
+        const uint hid = XSOCK_HOST_ID;
+#endif
         printk("XSOCK: HOST %u: INITIALIZING\n", hid);
 
         // INITIALIZE CONNECTIONS
@@ -716,7 +719,9 @@ static int __init xsock_init (void) {
             } else
                 printk("XSOCK: HOST %u: PATH %u: INTERFACE NOT FOUND\n", hid, pid);
         }
+#if XSOCK_SERVER
     }
+#endif
 
     return 0;
 }
@@ -732,10 +737,14 @@ static void __exit xsock_exit (void) {
     }
 
     //
+#if XSOCK_SERVER
     foreach (hid, XSOCK_HOSTS_N) {
+
+        xsock_host_s* const host = &hosts[hid];
+#endif
         foreach (pid, XSOCK_PATHS_N) {
 
-            net_device_s* itfc = hosts[hid].paths[pid].itfc;
+            net_device_s* itfc = host->paths[pid].itfc;            
 
             if (itfc) {
                 rtnl_lock();
@@ -751,7 +760,9 @@ static void __exit xsock_exit (void) {
                     dev_put(itfc);
             }
         }
+#if XSOCK_SERVER
     }
+#endif
 }
 
 module_init(xsock_init);
