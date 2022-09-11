@@ -462,7 +462,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     conn->burst = now + path->oBurst;
 
-    //
+    // TODO: CONFIRM WE HAVE THIS FREE SPACE
     const uint ipSize = BE16(wire->ip.size) + sizeof(u32);
 
     // RE-ENCAPSULATE
