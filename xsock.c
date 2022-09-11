@@ -463,6 +463,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     conn->burst = now + path->oBurst;
 
+    const uint pid = path - conn->paths;
+
     // TODO: CONFIRM WE HAVE THIS FREE SPACE
     const uint ipSize = BE16(wire->ip.size) + sizeof(u32);
 
@@ -474,12 +476,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->udp.src     = BE16(XSOCK_PORT);
            wire->udp.dst     = path->cport; // THE CLIENT IS BEHIND NAT
 #else
-           wire->udp.src     = BE16(XSOCK_PORT + (path - conn->paths));
+           wire->udp.src     = BE16(XSOCK_PORT + pid);
            wire->udp.dst     = BE16(XSOCK_PORT);
 #endif
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
-           wire->ip.id       = BE16((cid << 2) | (path - conn->paths));
+           wire->ip.id       = BE16((cid << 2) | pid);
            wire->ip.size     = BE16(ipSize);
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;

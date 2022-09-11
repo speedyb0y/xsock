@@ -1,14 +1,32 @@
 
+#define VPS_A 104
+#define VPS_B 238
+#define VPS_C 128
+#define VPS_D 121
+
+#define MYHOST 20
+#define ITFC0 "eth0"
+#define ITFC1 "eth0"
+#define ITFC2 "eth0"
+#define MAC0 "\xd0\x50\x99\xae\xde\x92"
+#define MAC1 "\xd0\x50\x99\xae\xde\x92"
+#define MAC2 "\xd0\x50\x99\xae\xde\x92"
+
+//#define MYHOST 50
+//#define ITFC0 "eth0"
+//#define ITFC1 "eth1"
+//#define ITFC2 "eth2"
+//#define MAC0 "\xe8\xde\x27\xa6\xd2\x3a"
+//#define MAC1 "\xbc\x5f\xf4\xf9\xe6\x66"
+//#define MAC2 "\xbc\x5f\xf4\xf9\xe6\x67"
+
+// -------
+
 #define XCONF_XSOCK_SERVER_IS 1
 #define XCONF_XSOCK_PORT 2000
 #define XCONF_XSOCK_MARK 100
 #define XCONF_XSOCK_CONNS_N 1024
 #define XCONF_XSOCK_PATHS_N 3
-
-#define VPS_A 104
-#define VPS_B 238
-#define VPS_C 128
-#define VPS_D 121
 
 #define XCONF_XSOCK_CLT_PATH_0_PKTS 500000
 #define XCONF_XSOCK_CLT_PATH_1_PKTS 500000
@@ -18,28 +36,28 @@
 #define XCONF_XSOCK_SRV_PATH_1_PKTS 500000
 #define XCONF_XSOCK_SRV_PATH_2_PKTS 500000
 
-#define XCONF_XSOCK_CLT_PATH_0_ITFC "eth0"
+#define XCONF_XSOCK_CLT_PATH_0_ITFC ITFC0
 #define XCONF_XSOCK_CLT_PATH_0_ADDR_0 192
 #define XCONF_XSOCK_CLT_PATH_0_ADDR_1 168
 #define XCONF_XSOCK_CLT_PATH_0_ADDR_2 0
-#define XCONF_XSOCK_CLT_PATH_0_ADDR_3 50
-#define XCONF_XSOCK_CLT_PATH_0_MAC "\xe8\xde\x27\xa6\xd2\x3a"
+#define XCONF_XSOCK_CLT_PATH_0_ADDR_3 MYHOST
+#define XCONF_XSOCK_CLT_PATH_0_MAC MAC0
 #define XCONF_XSOCK_CLT_PATH_0_GW  "\x54\x9f\x06\xf4\xc7\xa0"
 
-#define XCONF_XSOCK_CLT_PATH_1_ITFC "eth1"
+#define XCONF_XSOCK_CLT_PATH_1_ITFC ITFC1
 #define XCONF_XSOCK_CLT_PATH_1_ADDR_0 192
 #define XCONF_XSOCK_CLT_PATH_1_ADDR_1 168
 #define XCONF_XSOCK_CLT_PATH_1_ADDR_2 100
-#define XCONF_XSOCK_CLT_PATH_1_ADDR_3 50
-#define XCONF_XSOCK_CLT_PATH_1_MAC "\xbc\x5f\xf4\xf9\xe6\x66"
+#define XCONF_XSOCK_CLT_PATH_1_ADDR_3 MYHOST
+#define XCONF_XSOCK_CLT_PATH_1_MAC MAC1
 #define XCONF_XSOCK_CLT_PATH_1_GW  "\xcc\xed\x21\x96\x99\xc0"
 
-#define XCONF_XSOCK_CLT_PATH_2_ITFC "eth2"
+#define XCONF_XSOCK_CLT_PATH_2_ITFC ITFC2
 #define XCONF_XSOCK_CLT_PATH_2_ADDR_0 192
 #define XCONF_XSOCK_CLT_PATH_2_ADDR_1 168
 #define XCONF_XSOCK_CLT_PATH_2_ADDR_2 1
-#define XCONF_XSOCK_CLT_PATH_2_ADDR_3 50
-#define XCONF_XSOCK_CLT_PATH_2_MAC "\xbc\x5f\xf4\xf9\xe6\x67"
+#define XCONF_XSOCK_CLT_PATH_2_ADDR_3 MYHOST
+#define XCONF_XSOCK_CLT_PATH_2_MAC MAC2
 #define XCONF_XSOCK_CLT_PATH_2_GW  "\x90\x55\xde\xa1\xcd\xf0"
 
 #define XCONF_XSOCK_SRV_PATH_0_ITFC "enp1s0"
