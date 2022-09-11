@@ -489,8 +489,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->eth.type    = BE16(ETH_P_IP);
 
     //
-    *(u32*)(PTR(&wire->ip) +     ipSize) = BE32(xsock_out_encrypt(
-            PTR(&wire->ip) + 28, ipSize - 28));
+    *(u32*)(PTR(&wire->ip) +     ipSize - 4) = BE32(xsock_out_encrypt(
+            PTR(&wire->ip) + 28, ipSize - 4 - 28));
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
