@@ -285,8 +285,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         return RX_HANDLER_PASS;
 
     // IDENTIFY CONN AND PATH FROM IP ID
-    const uint cid = BE16(wire->ip.id) >> 3;
-    const uint pid = BE16(wire->ip.id) & 0b111U;
+    const uint cid = BE16(wire->ip.id) >> 2;
+    const uint pid = BE16(wire->ip.id) & 0b11U;
 
     // VALIDATE CONN ID
     // VALIDATE PATH ID
@@ -490,7 +490,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #endif
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
-           wire->ip.id       = BE16((cid << 3) | (path - conn->paths));
+           wire->ip.id       = BE16((cid << 2) | (path - conn->paths));
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
