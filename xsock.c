@@ -393,14 +393,6 @@ drop:
 
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
-#if 0
-    // IDENTIFY CONN FROM PACKET MARK
-    const uint cid = (uint)skb->mark - XSOCK_MARK;
-
-    if (cid >= XSOCK_CONNS_N)
-        goto drop;
-#endif
-
     if (skb_linearize(skb))
         goto drop;
 
@@ -412,29 +404,24 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (PTR(&wire->eth) < PTR(skb->head))
         goto drop;
 
-#if 1
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
      || wire->ip.src32   != ADDR_SRV_BE
      || wire->ip.dst32   != ADDR_CLT_BE
+     || wire->tcp.src    != BE16(XSOCK_PORT)
 #else
      || wire->ip.src32   != ADDR_CLT_BE
      || wire->ip.dst32   != ADDR_SRV_BE
+     || wire->tcp.dst    != BE16(XSOCK_PORT)
 #endif
-     //|| wire->tcp.src    != wire->tcp.dst
     )
         goto drop;
 
-#if XSOCK_SERVER
     const uint cid = BE16(wire->tcp.src) - XSOCK_PORT;
-#else
-    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
-#endif
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
-#endif
 
     const u64 now = jiffies;
 
