@@ -311,7 +311,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // VALIDATE HOST ID
     // VALIDATE PATH ID
-    if (hid >= XSOCK_HOSTS_N
+    if (
+#if XSOCK_SERVER
+        hid >= XSOCK_HOSTS_N
+#else
+        hid != XSOCK_HOST_ID
+#endif
      || pid >= XSOCK_PATHS_N)
         return RX_HANDLER_PASS;
 
