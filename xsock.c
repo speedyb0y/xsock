@@ -184,7 +184,7 @@ typedef struct xsock_path_s {
 } xsock_path_s;
 
 // EXPECTED SIZE
-#define XSOCK_CONN_SIZE CACHE_LINE_SIZE
+#define XSOCK_CONN_SIZE 32
 
 typedef struct xsock_conn_s {
     const xsock_path_s* path;
@@ -192,7 +192,6 @@ typedef struct xsock_conn_s {
     u64 limit;
     u32 pkts;
     u32 cdown;
-    u64 reserved[4];
 } xsock_conn_s;
 
 typedef struct xsock_cfg_path_s {
