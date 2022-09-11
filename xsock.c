@@ -85,15 +85,6 @@ typedef struct net_device_ops net_device_ops_s;
 #define ADDR_CLT_BE 0x010010ACU // 172.16.0.1
 #endif
 
-// THE ON-WIRE SERVER PORT WILL DETERMINE THE CONN AND PATH
-#define PORT(cid, pid) (XSOCK_PORT + (cid)*10 + (pid))
-#define PORT_CID(port) (((port) - XSOCK_PORT) / 10)
-#define PORT_PID(port) (((port) - XSOCK_PORT) % 10)
-
-#if PORT(XSOCK_CONNS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
-#error "BAD XSOCK_PORT / XSOCK_CONNS_N / XSOCK_PATHS_N"
-#endif
-
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
 
@@ -128,7 +119,7 @@ typedef struct xsock_wire_s {
         u8  version;
         u8  tos;
         u16 size;
-        u16 hash; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
+        u16 id; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
         u16 frag;
         u8  ttl;
         u8  protocol;
@@ -192,7 +183,12 @@ typedef struct xsock_conn_s {
     u64 burst; //
     u64 limit;
     u32 pkts;
-    u32 cdown;
+    u16 cdown;
+#if XSOCK_SERVER
+    u16 x;
+#else
+    u16 lport;
+#endif
     u64 reserved[4];
     xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
@@ -248,7 +244,7 @@ static const xsock_cfg_conn_s cfg = {
     }}
 };
 
-static uint xsock_out_encrypt (void* data, uint size) {
+static u32 xsock_out_encrypt (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -256,7 +252,7 @@ static uint xsock_out_encrypt (void* data, uint size) {
     return size;
 }
 
-static uint xsock_in_decrypt (void* data, uint size) {
+static u32 xsock_in_decrypt (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -288,14 +284,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
      || wire->ip.protocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
 
-    // IDENTIFY CONN AND PATH FROM SERVER PORT
-#if XSOCK_SERVER
-    const uint port = BE16(wire->udp.dst);
-#else
-    const uint port = BE16(wire->udp.src);
-#endif
-    const uint cid = PORT_CID(port);
-    const uint pid = PORT_PID(port);
+    // IDENTIFY CONN AND PATH FROM IP ID
+    const uint cid = BE16(wire->ip.id) >> 3;
+    const uint pid = BE16(wire->ip.id) & 0b111U;
 
     // VALIDATE CONN ID
     // VALIDATE PATH ID
@@ -303,20 +294,23 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
      || pid >= XSOCK_PATHS_N)
         return RX_HANDLER_PASS;
 
+    xsock_conn_s* const conn = &conns[cid];
+
     // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
     void* const payload = PTR(wire)
                     + sizeof(*wire);
     // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
     const uint size = BE16(wire->ip.size)
                   - sizeof(wire->ip)
-                  - sizeof(wire->udp);
+                  - sizeof(wire->udp)
+                  - sizeof(u32);
 
-    // DROP INCOMPLETE PAYLOADS
-    if ((payload + size) > SKB_TAIL(skb))
+    // DROP INCOMPLETE PACKETS
+    if ((payload + size + sizeof(u32)) > SKB_TAIL(skb))
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (BE16(xsock_in_decrypt(payload - 12, size + 12)) != wire->ip.hash)
+    if (xsock_in_decrypt(payload - 12, size + 12) != BE32(*(u32*)(payload + size)))
         goto drop;
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
@@ -329,7 +323,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
       +        wire->udp.src
     ;
 
-    xsock_path_s* const path = &conns[cid].paths[pid];
+    xsock_path_s* const path = &conn->paths[pid];
 
                  path->iActive = jiffies + path->iTimeout*HZ;
     if (unlikely(path->iHash != hash)) {
@@ -353,14 +347,13 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
-#if XSOCK_SERVER
     wire->tcp.src     = BE16(XSOCK_PORT + cid);
+#if XSOCK_SERVER
     wire->tcp.dst     = BE16(XSOCK_PORT);
     wire->ip.src32    = ADDR_CLT_BE;
     wire->ip.dst32    = ADDR_SRV_BE;
 #else
-    wire->tcp.src     = BE16(XSOCK_PORT);
-    wire->tcp.dst     = BE16(XSOCK_PORT + cid);
+    wire->tcp.dst     = conn->lport;
     wire->ip.src32    = ADDR_SRV_BE;
     wire->ip.dst32    = ADDR_CLT_BE;
 #endif
@@ -379,7 +372,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->ip_summed = CHECKSUM_UNNECESSARY;
     skb->csum_valid = 1;
     skb->dev = xdev;
-    skb->mark = XSOCK_MARK + cid;
 
     return RX_HANDLER_ANOTHER;
 
@@ -401,9 +393,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         + sizeof(wire->tcp)
        - sizeof(*wire);
 
-    if (PTR(&wire->eth) < PTR(skb->head))
-        goto drop;
-
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
@@ -413,12 +402,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #else
      || wire->ip.src32   != ADDR_CLT_BE
      || wire->ip.dst32   != ADDR_SRV_BE
-     || wire->tcp.dst    != BE16(XSOCK_PORT)
 #endif
     )
         goto drop;
 
-    const uint cid = BE16(wire->tcp.src) - XSOCK_PORT;
+    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
 
     if (cid >= XSOCK_CONNS_N)
         goto drop;
@@ -430,12 +418,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const xsock_path_s* path = conn->path;
 
     //
-    if (wire->tcp.flags & (
-        XSOCK_WIRE_TCP_SYN |
-        XSOCK_WIRE_TCP_RST |
-        XSOCK_WIRE_TCP_FIN
-    ))
+    if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN) {
+#if !XSOCK_SERVER // THE CLIENT USES AN ETHEMERAL PORT
+        conn->lport = wire->tcp.dst;
+#endif
         conn->cdown = 2*XSOCK_PATHS_N;
+    }
 
     if (conn->cdown) {
         conn->cdown--;
@@ -491,23 +479,27 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // RE-ENCAPSULATE
            wire->udp.seq     = wire->tcp.seq;
-           wire->udp.size    = BE16(sizeof(wire->udp) + size);
+           wire->udp.size    = BE16(sizeof(wire->udp) + size + 4);
            wire->udp.cksum   = 0;
-           wire->ip.hash     = BE16(xsock_out_encrypt(payload - 12, size + 12));
-           wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
-#if XSOCK_SERVER // THE CLIENT IS BEHIND NAT
-           wire->udp.dst     = path->cport;
+#if XSOCK_SERVER
+           wire->udp.src     = BE16(XSOCK_PORT);
+           wire->udp.dst     = path->cport; // THE CLIENT IS BEHIND NAT
 #else
-           wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
+           wire->udp.src     = BE16(XSOCK_PORT + (path - conn->paths));
+           wire->udp.dst     = BE16(XSOCK_PORT);
 #endif
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
+           wire->ip.id       = BE16((cid << 3) | (path - conn->paths));
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
     memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
     memcpy(wire->eth.src,      path->mac, ETH_ALEN);
            wire->eth.type    = BE16(ETH_P_IP);
+
+    //
+    *(u32*)(payload + size)  = BE32(xsock_out_encrypt(payload - 12, size + 12));
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
