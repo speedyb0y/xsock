@@ -690,29 +690,26 @@ static int __init xsock_init (void) {
 
             net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
-            if (itfc) {
+            if (itfc) { // TODO: FIXME: VAI TER QUE USAR O rx_handler_data COMO USAGE COUNT
+
+                printk("XSOCK: INTERFACE %s: HOOKING\n", itfc->name);
 
                 rtnl_lock();
 
                 // HOOK INTERFACE
                 if (rcu_dereference(itfc->rx_handler) != xsock_in) {
                     // NOT HOOKED YET
-                    printk("XSOCK: INTERFACE %s: HOOKING\n", itfc->name);
-                    if (!netdev_rx_handler_register(itfc, xsock_in, NULL)) {
+                    if (!netdev_rx_handler_register(itfc, xsock_in, NULL))
                         // HOOK SUCCESS
-                        // NOTE: ISSO É PARA QUE POSSA DAR FORWARD NOS PACOTES
-                        // NOTE: A INTERFACE JA TEM O ETH_HLEN
-                        itfc->hard_header_len += sizeof(xsock_path_s) - ETH_HLEN;
-                        itfc->min_header_len  += sizeof(xsock_path_s) - ETH_HLEN;
-                        //
                         path->itfc = itfc;
-                    }
                 } else // ALREADY HOOKED
                     path->itfc = itfc;
 
                 rtnl_unlock();
 
-                if (!path->itfc) { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
+                if (path->itfc)
+                    printk("XSOCK: HOST %u: PATH %u: INTERFACE HOOKED\n", hid, pid);
+                else { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
                     printk("XSOCK: HOST %u: PATH %u: INTERFACE NOT HOOKED\n", hid, pid);
                     dev_put(itfc);
                 }
