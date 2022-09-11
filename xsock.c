@@ -194,6 +194,11 @@ typedef struct xsock_conn_s {
     u32 cdown;
 } xsock_conn_s;
 
+typedef struct xsock_host_s {
+    xsock_path_s paths[XSOCK_PATHS_N];
+    xsock_conn_s conns[0xFFFF+1];
+} xsock_host_s;
+
 typedef struct xsock_cfg_path_s {
     char itfc[IFNAMSIZ];
     uint oBurst;
@@ -214,11 +219,6 @@ typedef struct xsock_cfg_conn_s {
     xsock_cfg_side_s clt;
     xsock_cfg_side_s srv;
 } xsock_cfg_conn_s;
-
-typedef struct xsock_host_s {
-    xsock_path_s paths[XSOCK_PATHS_N];
-    xsock_conn_s conns[0xFFFF+1];
-} xsock_host_s;
 
 static net_device_s* xdev;
 static xsock_host_s hosts[XSOCK_HOSTS_N];
