@@ -211,20 +211,16 @@ typedef struct xsock_cfg_path_s {
     u8   addr[4];
 } xsock_cfg_path_s;
 
-typedef struct xsock_cfg_side_s {
-    xsock_cfg_path_s paths[XSOCK_PATHS_N];
-} xsock_cfg_side_s;
-
-typedef struct xsock_cfg_conn_s {
-    xsock_cfg_side_s clt;
-    xsock_cfg_side_s srv;
-} xsock_cfg_conn_s;
+typedef struct xsock_cfg_s {
+    xsock_cfg_path_s clt[XSOCK_PATHS_N];
+    xsock_cfg_path_s srv[XSOCK_PATHS_N];
+} xsock_cfg_s;
 
 static net_device_s* xdev;
 static xsock_host_s hosts[XSOCK_HOSTS_N];
 
-static const xsock_cfg_conn_s cfg = {
-    .clt = { .paths = {
+static const xsock_cfg_s cfg = {
+    .clt = {
         { .oPkts = XCONF_XSOCK_CLT_PATH_0_PKTS, .oBurst = HZ/5, .oTime = 10,               .itfc = XCONF_XSOCK_CLT_PATH_0_ITFC, .mac = XCONF_XSOCK_CLT_PATH_0_MAC, .gw = XCONF_XSOCK_CLT_PATH_0_GW, .addr = {XCONF_XSOCK_CLT_PATH_0_ADDR_0,XCONF_XSOCK_CLT_PATH_0_ADDR_1,XCONF_XSOCK_CLT_PATH_0_ADDR_2,XCONF_XSOCK_CLT_PATH_0_ADDR_3}, },
 #if XSOCK_PATHS_N > 1
         { .oPkts = XCONF_XSOCK_CLT_PATH_1_PKTS, .oBurst = HZ/5, .oTime = 10,               .itfc = XCONF_XSOCK_CLT_PATH_1_ITFC, .mac = XCONF_XSOCK_CLT_PATH_1_MAC, .gw = XCONF_XSOCK_CLT_PATH_1_GW, .addr = {XCONF_XSOCK_CLT_PATH_1_ADDR_0,XCONF_XSOCK_CLT_PATH_1_ADDR_1,XCONF_XSOCK_CLT_PATH_1_ADDR_2,XCONF_XSOCK_CLT_PATH_1_ADDR_3}, },
@@ -235,8 +231,8 @@ static const xsock_cfg_conn_s cfg = {
 #endif
 #endif
 #endif
-    }},
-    .srv = { .paths = {
+    },
+    .srv = {
         { .oPkts = XCONF_XSOCK_SRV_PATH_0_PKTS, .oBurst = HZ/5, .oTime = 10, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_0_ITFC, .mac = XCONF_XSOCK_SRV_PATH_0_MAC, .gw = XCONF_XSOCK_SRV_PATH_0_GW, .addr = {XCONF_XSOCK_SRV_PATH_0_ADDR_0,XCONF_XSOCK_SRV_PATH_0_ADDR_1,XCONF_XSOCK_SRV_PATH_0_ADDR_2,XCONF_XSOCK_SRV_PATH_0_ADDR_3}, },
 #if XSOCK_PATHS_N > 1
         { .oPkts = XCONF_XSOCK_SRV_PATH_1_PKTS, .oBurst = HZ/5, .oTime = 10, .iTimeout = 35, .itfc = XCONF_XSOCK_SRV_PATH_1_ITFC, .mac = XCONF_XSOCK_SRV_PATH_1_MAC, .gw = XCONF_XSOCK_SRV_PATH_1_GW, .addr = {XCONF_XSOCK_SRV_PATH_1_ADDR_0,XCONF_XSOCK_SRV_PATH_1_ADDR_1,XCONF_XSOCK_SRV_PATH_1_ADDR_2,XCONF_XSOCK_SRV_PATH_1_ADDR_3}, },
@@ -247,7 +243,7 @@ static const xsock_cfg_conn_s cfg = {
 #endif
 #endif
 #endif
-    }}
+    }
 };
 
 static u32 xsock_out_encrypt (void* data, uint size) {
@@ -637,11 +633,11 @@ static int __init xsock_init (void) {
             xsock_path_s* const path = &host->paths[pid];
 
 #if XSOCK_SERVER
-            const xsock_cfg_path_s* const this = &cfg.srv.paths[pid];
-            const xsock_cfg_path_s* const peer = &cfg.clt.paths[pid];
+            const xsock_cfg_path_s* const this = &cfg.srv[pid];
+            const xsock_cfg_path_s* const peer = &cfg.clt[pid];
 #else
-            const xsock_cfg_path_s* const this = &cfg.clt.paths[pid];
-            const xsock_cfg_path_s* const peer = &cfg.srv.paths[pid];
+            const xsock_cfg_path_s* const this = &cfg.clt[pid];
+            const xsock_cfg_path_s* const peer = &cfg.srv[pid];
 #endif
             printk("XSOCK: HOST %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up %us IN TIMEOUT %us ITFC %s"
                 " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
