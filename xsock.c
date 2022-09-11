@@ -462,17 +462,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     conn->burst = now + path->oBurst;
 
-    // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
-    void* const payload = PTR(wire)
-                    + sizeof(*wire);
-    // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint size = BE16(wire->ip.size)
-                  - sizeof(wire->ip)
-                  - sizeof(wire->tcp);
+    //
+    const uint ipSize = BE16(wire->ip.size) + sizeof(u32);
 
     // RE-ENCAPSULATE
            wire->udp.seq     = wire->tcp.seq;
-           wire->udp.size    = BE16(sizeof(wire->udp) + size + 4);
+           wire->udp.size    = BE16(ipSize - 20);
            wire->udp.cksum   = 0;
 #if XSOCK_SERVER
            wire->udp.src     = BE16(XSOCK_PORT);
@@ -484,6 +479,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
            wire->ip.id       = BE16((cid << 2) | (path - conn->paths));
+           wire->ip.size     = BE16(ipSize);
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
@@ -492,13 +488,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->eth.type    = BE16(ETH_P_IP);
 
     //
-    *(u32*)(payload + size)  = BE32(xsock_out_encrypt(payload - 12, size + 12));
+    *(u32*)(PTR(&wire->ip) + ipSize) = BE32(xsock_out_encrypt(PTR(&wire->ip) + 28, ipSize - 28));
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
     skb->transport_header = PTR(&wire->udp) - PTR(skb->head);
-    skb->len              = sizeof(*wire) - sizeof(wire->_align) + size;
+    skb->len              = ipSize;
     skb->mac_len          = ETH_HLEN;
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
