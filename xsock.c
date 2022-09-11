@@ -745,3 +745,5 @@ NO IN
 e no transmit
 o header nao pode ser CONST!!!
 */
+
+// TODO: NAO CALCULAR O HASH IP E TCP ANTES DE PASSAR PARA A INTERFACE XGW
