@@ -300,11 +300,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint ipSize = BE16(wire->ip.size) - sizeof(u32);
 
     // DROP INCOMPLETE PACKETS
-    if ((PTR(wire) + ipSize + sizeof(u32)) > SKB_TAIL(skb))
+    if ((PTR(&wire->ip) + ipSize + sizeof(u32)) > SKB_TAIL(skb))
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(PTR(wire) + 28, ipSize - 28) != BE32(*(u32*)(PTR(wire) + ipSize)))
+    if (xsock_in_decrypt(PTR(&wire->ip) + 28, ipSize - 28) != BE32(*(u32*)(PTR(&wire->ip) + ipSize)))
         goto drop;
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
