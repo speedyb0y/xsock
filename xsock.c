@@ -507,11 +507,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->udp.size    = BE16(sizeof(wire->udp) + size);
            wire->udp.cksum   = 0;
            wire->ip.hash     = BE16(xsock_out_encrypt(payload - 12, size + 12));
-#if XSOCK_SERVER // THE CLIENT IS BEHIND NAT
            wire->udp.src     = BE16(PORT(cid, (path - conn->paths)));
+#if XSOCK_SERVER // THE CLIENT IS BEHIND NAT
            wire->udp.dst     = path->cport;
 #else
-        // wire->udp.src
            wire->udp.dst     = BE16(PORT(cid, (path - conn->paths)));
 #endif
            wire->ip.src32    = path->saddr32;
@@ -655,7 +654,7 @@ static int __init xsock_init (void) {
             const xsock_cfg_path_s* const peer = &cfg.srv.paths[pid];
 #endif
             if (cid == 0 && this->oPkts)
-                printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX PKTS %u MAX TIME %us IN TIMEOUT %us ITFC %s"
+                printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up %us IN TIMEOUT %us ITFC %s"
                     " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
                     " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
                     cid, pid,
