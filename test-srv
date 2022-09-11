@@ -18,4 +18,4 @@ tc qdisc  replace dev enp1s0 root pfifo_fast
 ip link set dev xsock up
 
 ip -4 addr add dev xsock 172.16.0.0
-ip -4 route add dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 172.16.0.0 172.16.0.1 rtt 210ms rto_min 400ms
+ip -4 route add dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 172.16.0.0 172.16.0.0/24 rtt 210ms rto_min 400ms
