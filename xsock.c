@@ -692,8 +692,8 @@ static int __init xsock_init (void) {
 
             if (itfc) { // TODO: FIXME: VAI TER QUE USAR O rx_handler_data COMO USAGE COUNT
 
-                printk("XSOCK: INTERFACE %s: HOOKING\n", itfc->name);
-
+                printk("XSOCK: HOST %u: PATH %u: INTERFACE HOOKING %s\n", hid, pid, itfc->name);
+                
                 rtnl_lock();
 
                 // HOOK INTERFACE
