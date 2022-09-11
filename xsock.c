@@ -196,7 +196,7 @@ typedef struct xsock_conn_s {
 
 typedef struct xsock_host_s {
     xsock_path_s paths[XSOCK_PATHS_N];
-    xsock_conn_s conns[0xFFFF+1];
+    xsock_conn_s conns[XSOCK_CONNS_N];
 } xsock_host_s;
 
 typedef struct xsock_cfg_path_s {
@@ -620,7 +620,7 @@ static int __init xsock_init (void) {
         printk("XSOCK: HOST %u: INITIALIZING\n", hid);
 
         // INITIALIZE CONNECTIONS
-        foreach (cid, 65536) {
+        foreach (cid, XSOCK_CONNS_N) {
 
             xsock_conn_s* const conn = &host->conns[cid];
 
