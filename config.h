@@ -20,6 +20,8 @@
 #define MAC1 "\xbc\x5f\xf4\xf9\xe6\x66"
 #define MAC2 "\xbc\x5f\xf4\xf9\xe6\x67"
 
+#define XCONF_XSOCK_HOST_ID 1
+
 // -------
 
 #define XCONF_XSOCK_SERVER_IS 1
