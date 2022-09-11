@@ -77,13 +77,8 @@ typedef struct net_device_ops net_device_ops_s;
 #error "BAD XSOCK_PATHS_N"
 #endif
 
-#ifdef __BIG_ENDIAN
-#define ADDR_SRV_BE 0xAC100000U // 172.16.0.0
-#define ADDR_CLT_BE 0xAC100001U // 172.16.0.1
-#else
-#define ADDR_SRV_BE 0x000010ACU // 172.16.0.0
-#define ADDR_CLT_BE 0x010010ACU // 172.16.0.1
-#endif
+#define ADDR_SRV 0xAC100000U // 172.16.0.0
+#define ADDR_CLT 0xAC100001U // 172.16.0.1
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
@@ -119,7 +114,7 @@ typedef struct xsock_wire_s {
         u8  version;
         u8  tos;
         u16 size;
-        u16 id; // A CHECKSUM TO CONFIRM THE INTEGRITY AND AUTHENTICITY OF THE PAYLOAD
+        u16 cid; // CONNECTION ID (CLIENT SOURCE (EPHEMERAL) PORT)
         u16 frag;
         u8  ttl;
         u8  protocol;
@@ -176,21 +171,15 @@ typedef struct xsock_path_s {
 } xsock_path_s;
 
 // EXPECTED SIZE
-#define XSOCK_CONN_SIZE (CACHE_LINE_SIZE + XSOCK_PATHS_N*XSOCK_PATH_SIZE)
+#define XSOCK_CONN_SIZE CACHE_LINE_SIZE
 
 typedef struct xsock_conn_s {
     const xsock_path_s* path;
     u64 burst; //
     u64 limit;
     u32 pkts;
-    u16 cdown;
-#if XSOCK_SERVER
-    u16 x;
-#else
-    u16 lport;
-#endif
+    u32 cdown;
     u64 reserved[4];
-    xsock_path_s paths[XSOCK_PATHS_N];
 } xsock_conn_s;
 
 typedef struct xsock_cfg_path_s {
@@ -214,8 +203,15 @@ typedef struct xsock_cfg_conn_s {
     xsock_cfg_side_s srv;
 } xsock_cfg_conn_s;
 
+typedef struct xsock_host_s {
+    xsock_path_s paths[XSOCK_PATHS_N];
+    xsock_conn_s conns[0xFFFF+1];
+} xsock_host_s;
+
+#define XSOCK_HOSTS_N 4
+
 static net_device_s* xdev;
-static xsock_conn_s conns[XSOCK_CONNS_N];
+static xsock_host_s hosts[XSOCK_HOSTS_N];
 
 static const xsock_cfg_conn_s cfg = {
     .clt = { .paths = {
@@ -284,17 +280,21 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
      || wire->ip.protocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
 
-    // IDENTIFY CONN AND PATH FROM IP ID
-    const uint cid = BE16(wire->ip.id) >> 2;
-    const uint pid = BE16(wire->ip.id) & 0b11U;
+    // IDENTIFY HOST, PATH AND CONN
+#if XSOCK_SERVER
+    const uint srvPort = BE16(wire->udp.dst);
+#else
+    const uint srvPort = BE16(wire->udp.src);
+#endif
+    const uint hid = (srvPort - XSOCK_PORT) / 10;
+    const uint pid = (srvPort - XSOCK_PORT) % 10;
+    const uint cid = BE16(wire->ip.cid);
 
-    // VALIDATE CONN ID
+    // VALIDATE HOST ID
     // VALIDATE PATH ID
-    if (cid >= XSOCK_CONNS_N
+    if (hid >= XSOCK_HOSTS_N
      || pid >= XSOCK_PATHS_N)
         return RX_HANDLER_PASS;
-
-    xsock_conn_s* const conn = &conns[cid];
 
     // THE PACKET IS THE SAME EXCEPT THE HASH
     const uint ipSize = BE16(wire->ip.size) - sizeof(u32);
@@ -318,7 +318,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
       +        wire->udp.src
     ;
 
-    xsock_path_s* const path = &conn->paths[pid];
+    xsock_host_s* const host = &hosts[hid];
+    xsock_path_s* const path = &host->paths[pid];
 
                  path->iActive = jiffies + path->iTimeout*HZ;
     if (unlikely(path->iHash != hash)) {
@@ -330,10 +331,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->daddr32 = wire->ip.src32;
                  path->cport   = wire->udp.src;
 
-        printk("XSOCK: CONN %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
+        printk("XSOCK: HOST %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
-            cid, pid, (uintll)path->iHash, path->itfc->name,
+            hid, pid, (uintll)path->iHash, path->itfc->name,
             _MAC(path->mac), _IP4(path->saddr), BE16(wire->udp.dst),
             _MAC(path->gw),  _IP4(path->daddr), BE16(path->cport));
     }
@@ -342,15 +343,16 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
-    wire->tcp.src     = BE16(XSOCK_PORT + cid);
 #if XSOCK_SERVER
+    wire->tcp.src     = BE16(XSOCK_PORT + cid);
     wire->tcp.dst     = BE16(XSOCK_PORT);
-    wire->ip.src32    = ADDR_CLT_BE;
-    wire->ip.dst32    = ADDR_SRV_BE;
+    wire->ip.src32    = BE32(ADDR_CLT + hid);
+    wire->ip.dst32    = BE32(ADDR_SRV);
 #else
-    wire->tcp.dst     = conn->lport;
-    wire->ip.src32    = ADDR_SRV_BE;
-    wire->ip.dst32    = ADDR_CLT_BE;
+    wire->tcp.src     = BE16(XSOCK_PORT);
+    wire->tcp.dst     = BE16(cid);
+    wire->ip.src32    = BE32(ADDR_SRV);
+    wire->ip.dst32    = BE32(ADDR_CLT + hid);
 #endif
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.size     = BE16(ipSize);
@@ -390,39 +392,41 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (PTR(&wire->eth) < PTR(skb->head)
      || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
-     || wire->ip.src32   != ADDR_SRV_BE
-     || wire->ip.dst32   != ADDR_CLT_BE
+     || wire->ip.src32   != BE32(ADDR_SRV)
      || wire->tcp.src    != BE16(XSOCK_PORT)
 #else
-     || wire->ip.src32   != ADDR_CLT_BE
-     || wire->ip.dst32   != ADDR_SRV_BE
+     || wire->ip.dst32   != BE32(ADDR_SRV)
+     || wire->tcp.dst    != BE16(XSOCK_PORT)
 #endif
     )
         goto drop;
 
-    const uint cid = BE16(wire->tcp.dst) - XSOCK_PORT;
+    const uint hid = (BE32(wire->ip.src32) & 0xFFU) - 1;
 
-    if (cid >= XSOCK_CONNS_N)
+    if (hid >= XSOCK_HOSTS_N)
         goto drop;
+        
+#if XSOCK_SERVER
+    const uint cid = BE16(wire->tcp.dst);
+#else
+    const uint cid = BE16(wire->tcp.src);
+#endif
 
     const u64 now = jiffies;
 
-    xsock_conn_s* const conn = &conns[cid];
-
-    const xsock_path_s* path = conn->path;
+    xsock_host_s* const host = &hosts[hid];
+    xsock_conn_s* const conn = &host->conns[cid];
 
     //
-    if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN) {
-#if !XSOCK_SERVER // THE CLIENT USES AN ETHEMERAL PORT
-        conn->lport = wire->tcp.src;
-#endif
-        conn->cdown = 2*XSOCK_PATHS_N;
-    }
+    if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN)
+        conn->cdown = 3*XSOCK_PATHS_N;
 
     if (conn->cdown) {
         conn->cdown--;
         conn->pkts = 0;
     }
+
+    const xsock_path_s* path = conn->path;
 
     // CHOOSE PATH
     if (conn->pkts == 0
@@ -442,7 +446,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                 // NENHUM PATH DISPONÍVEL
                 goto drop;
             // GO TO NEXT PATH
-            path = &conn->paths[((path - conn->paths) + 1) % XSOCK_PATHS_N];
+            path = &host->paths[((path - host->paths) + 1) % XSOCK_PATHS_N];
         } while (!(
             path->oPkts
 #if XSOCK_SERVER
@@ -463,7 +467,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     conn->burst = now + path->oBurst;
 
-    const uint pid = path - conn->paths;
+    const uint pid = path - host->paths;
 
     // TODO: CONFIRM WE HAVE THIS FREE SPACE
     const uint ipSize = BE16(wire->ip.size) + sizeof(u32);
@@ -473,15 +477,15 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->udp.size    = BE16(ipSize - 20);
            wire->udp.cksum   = 0;
 #if XSOCK_SERVER
-           wire->udp.src     = BE16(XSOCK_PORT);
+           wire->udp.src     = BE16(XSOCK_PORT + hid*10 + pid);
            wire->udp.dst     = path->cport; // THE CLIENT IS BEHIND NAT
 #else
-           wire->udp.src     = BE16(XSOCK_PORT + pid);
-           wire->udp.dst     = BE16(XSOCK_PORT);
+           wire->udp.src     = BE16(XSOCK_PORT);
+           wire->udp.dst     = BE16(XSOCK_PORT + hid*10 + pid);
 #endif
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
-           wire->ip.id       = BE16((cid << 2) | pid);
+           wire->ip.cid      = BE16(cid);
            wire->ip.size     = BE16(ipSize);
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
@@ -598,25 +602,29 @@ static int __init xsock_init (void) {
 
     xdev = dev;
 
-    // INITIALIZE CONNS
-    foreach (cid, XSOCK_CONNS_N) {
+    // INITIALIZE HOSTS
+    foreach (hid, XSOCK_HOSTS_N) {
 
-        xsock_conn_s* const conn = &conns[cid];
+        xsock_host_s* const host = &hosts[hid];
 
-        if (cid == 0)
-            printk("XSOCK: CONN %u: INITIALIZING\n", cid);
+        printk("XSOCK: HOST %u: INITIALIZING\n", hid);
 
-        // INITIALIZE IT
-        conn->path   = &conn->paths[0];
-        conn->burst  = 0;
-        conn->limit  = 0;
-        conn->pkts   = 0;
-        conn->cdown  = 0;
+        // INITIALIZE CONNECTIONS
+        foreach (cid, 65536) {
+
+            xsock_conn_s* const conn = &host->conns[cid];
+
+            conn->path   = &host->paths[0];
+            conn->burst  = 0;
+            conn->limit  = 0;
+            conn->pkts   = 0;
+            conn->cdown  = 0;
+        }
 
         // INITIALIZE ITS PATHS
         foreach (pid, XSOCK_PATHS_N) {
 
-            xsock_path_s* const path = &conn->paths[pid];
+            xsock_path_s* const path = &host->paths[pid];
 
 #if XSOCK_SERVER
             const xsock_cfg_path_s* const this = &cfg.srv.paths[pid];
@@ -625,19 +633,18 @@ static int __init xsock_init (void) {
             const xsock_cfg_path_s* const this = &cfg.clt.paths[pid];
             const xsock_cfg_path_s* const peer = &cfg.srv.paths[pid];
 #endif
-            if (cid == 0 && this->oPkts)
-                printk("XSOCK: CONN %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up %us IN TIMEOUT %us ITFC %s"
-                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
-                    " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
-                    cid, pid,
-                    this->oBurst,
-                    this->oPkts,
-                    this->oTime,
-                    this->iTimeout,
-                    this->itfc,
-                    _MAC(this->mac), _IP4(this->addr),
-                    _MAC(this->gw),  _IP4(peer->addr)
-                );
+            printk("XSOCK: HOST %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up %us IN TIMEOUT %us ITFC %s"
+                " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
+                " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
+                hid, pid,
+                this->oBurst,
+                this->oPkts,
+                this->oTime,
+                this->iTimeout,
+                this->itfc,
+                _MAC(this->mac), _IP4(this->addr),
+                _MAC(this->gw),  _IP4(peer->addr)
+            );
 
             path->itfc      =  NULL;
             path->oPkts     = this->oPkts;
@@ -683,11 +690,11 @@ static int __init xsock_init (void) {
                 rtnl_unlock();
 
                 if (!path->itfc) { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
-                    printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT HOOKED\n", cid, pid);
+                    printk("XSOCK: HOST %u: PATH %u: INTERFACE NOT HOOKED\n", hid, pid);
                     dev_put(itfc);
                 }
             } else
-                printk("XSOCK: CONN %u: PATH %u: INTERFACE NOT FOUND\n", cid, pid);
+                printk("XSOCK: HOST %u: PATH %u: INTERFACE NOT FOUND\n", hid, pid);
         }
     }
 
@@ -705,10 +712,10 @@ static void __exit xsock_exit (void) {
     }
 
     //
-    foreach (cid, XSOCK_CONNS_N) {
+    foreach (hid, XSOCK_HOSTS_N) {
         foreach (pid, XSOCK_PATHS_N) {
 
-            net_device_s* itfc = conns[cid].paths[pid].itfc;
+            net_device_s* itfc = hosts[hid].paths[pid].itfc;
 
             if (itfc) {
                 rtnl_lock();
