@@ -62,20 +62,33 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_PORT        XCONF_XSOCK_PORT
 #define XSOCK_MARK        XCONF_XSOCK_MARK
-#define XSOCK_CONNS_N     XCONF_XSOCK_CONNS_N
+#define XSOCK_HOSTS_N     XCONF_XSOCK_HOSTS_N
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
 
 #if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
 #error "BAD XSOCK_PORT"
 #endif
 
-#if ! (1 <= XSOCK_CONNS_N && XSOCK_CONNS_N <= 0xFFFF)
-#error "BAD XSOCK_CONNS_N"
+#if ! (1 <= XSOCK_HOSTS_N && XSOCK_HOSTS_N <= 254)
+#error "BAD XSOCK_HOSTS_N"
 #endif
 
 #if ! (1 <= XSOCK_PATHS_N && XSOCK_PATHS_N <= 4)
 #error "BAD XSOCK_PATHS_N"
 #endif
+
+// THE ON-WIRE SERVER PORT WILL DETERMINE THE HOST AND PATH
+#define PORT(hid, pid) (XSOCK_PORT + (hid)*10 + (pid))
+#define PORT_HID(port) (((port) - XSOCK_PORT) / 10)
+#define PORT_PID(port) (((port) - XSOCK_PORT) % 10)
+
+// O ULTIMO HOST E ULTIMO PATH TEM QUE DAR UMA PORTA VALIDA
+#if PORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
+#error "BAD XSOCK_PORT / XSOCK_HOSTS_N / XSOCK_PATHS_N"
+#endif
+
+// 0xFFFF + 1
+#define XSOCK_CONNS_N 65536
 
 #define ADDR_SRV 0xAC100000U // 172.16.0.0
 #define ADDR_CLT 0xAC100001U // 172.16.0.1
@@ -208,8 +221,6 @@ typedef struct xsock_host_s {
     xsock_conn_s conns[0xFFFF+1];
 } xsock_host_s;
 
-#define XSOCK_HOSTS_N 4
-
 static net_device_s* xdev;
 static xsock_host_s hosts[XSOCK_HOSTS_N];
 
@@ -286,8 +297,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #else
     const uint srvPort = BE16(wire->udp.src);
 #endif
-    const uint hid = (srvPort - XSOCK_PORT) / 10;
-    const uint pid = (srvPort - XSOCK_PORT) % 10;
+    const uint hid = PORT_HID(srvPort);
+    const uint pid = PORT_PID(srvPort);
     const uint cid = BE16(wire->ip.cid);
 
     // VALIDATE HOST ID
@@ -477,11 +488,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->udp.size    = BE16(ipSize - 20);
            wire->udp.cksum   = 0;
 #if XSOCK_SERVER
-           wire->udp.src     = BE16(XSOCK_PORT + hid*10 + pid);
+           wire->udp.src     = BE16(PORT(hid, pid));
            wire->udp.dst     = path->cport; // THE CLIENT IS BEHIND NAT
 #else
            wire->udp.src     = BE16(XSOCK_PORT);
-           wire->udp.dst     = BE16(XSOCK_PORT + hid*10 + pid);
+           wire->udp.dst     = BE16(PORT(hid, pid));
 #endif
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
