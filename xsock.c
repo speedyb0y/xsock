@@ -744,7 +744,7 @@ static void __exit xsock_exit (void) {
 #endif
         foreach (pid, XSOCK_PATHS_N) {
 
-            net_device_s* itfc = host->paths[pid].itfc;            
+            net_device_s* itfc = host->paths[pid].itfc;
 
             if (itfc) {
                 rtnl_lock();
