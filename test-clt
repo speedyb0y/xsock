@@ -12,7 +12,7 @@ echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
 
 ip link set dev xsock up
 
-ISP_MTU=1472
+ISP_MTU=1492
 
 ip -4 rule add priority 10 table ${TABLE_XSOCK} to 172.16.0.0
 ip -4 rule add priority 10 table ${TABLE_XSOCK} from 172.16.0.1
@@ -20,5 +20,5 @@ ip -4 rule add priority 10 table ${TABLE_XSOCK} oif xsock
 ip -4 addr add dev xsock 172.16.0.1
 #rttvar TIME (Linux 2.3.15+ only)
 #ssthresh NUMBER (Linux 2.3.15+ only)
-ip -4 route add table ${TABLE_XSOCK} dev xsock mtu ${ISP_MTU} advmss $[${ISP_MTU}-40] src 172.16.0.1 172.16.0.0 rtt 210ms rto_min 400ms
+ip -4 route add table ${TABLE_XSOCK} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 172.16.0.1 172.16.0.0 rtt 210ms rto_min 400ms
 ip -4 route flush cache
