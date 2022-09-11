@@ -223,6 +223,8 @@ typedef struct xsock_cfg_s {
     xsock_cfg_path_s srv[XSOCK_PATHS_N];
 } xsock_cfg_s;
 
+#define PID(path) ((path) - host->paths)
+
 static net_device_s* xdev;
 #if XSOCK_SERVER
 static xsock_host_s hosts[XSOCK_HOSTS_N];
@@ -466,7 +468,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                 // NENHUM PATH DISPONÍVEL
                 goto drop;
             // GO TO NEXT PATH
-            path = &host->paths[((path - host->paths) + 1) % XSOCK_PATHS_N];
+            path = &host->paths[((PID(path)) + 1) % XSOCK_PATHS_N];
         } while (!(
             path->oPkts
 #if XSOCK_SERVER
@@ -487,7 +489,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     conn->burst = now + path->oBurst;
 
-    const uint pid = path - host->paths;
+    const uint pid = PID(path);
 
     // TODO: CONFIRM WE HAVE THIS FREE SPACE
     const uint ipSize = BE16(wire->ip.size) + sizeof(u32);
