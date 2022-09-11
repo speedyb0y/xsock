@@ -296,21 +296,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     xsock_conn_s* const conn = &conns[cid];
 
-    // THE PAYLOAD IS JUST AFTER OUR ENCAPSULATION
-    void* const payload = PTR(wire)
-                    + sizeof(*wire);
-    // THE PAYLOAD SIZE IS EVERYTHING EXCEPT OUR ENCAPSULATION
-    const uint size = BE16(wire->ip.size)
-                  - sizeof(wire->ip)
-                  - sizeof(wire->udp)
-                  - sizeof(u32);
+    // THE PACKET IS THE SAME EXCEPT THE HASH
+    const uint ipSize = BE16(wire->ip.size) - sizeof(u32);
 
     // DROP INCOMPLETE PACKETS
-    if ((payload + size + sizeof(u32)) > SKB_TAIL(skb))
+    if ((PTR(wire) + ipSize + sizeof(u32)) > SKB_TAIL(skb))
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(payload - 12, size + 12) != BE32(*(u32*)(payload + size)))
+    if (xsock_in_decrypt(PTR(wire) + 28, ipSize - 28) != BE32(*(u32*)(PTR(wire) + ipSize)))
         goto drop;
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
@@ -358,6 +352,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->ip.dst32    = ADDR_CLT_BE;
 #endif
     wire->ip.protocol = IPPROTO_TCP;
+    wire->ip.size     = BE16(ipSize);
     wire->ip.cksum    = 0;
     wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
 
@@ -365,9 +360,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->data            = PTR(&wire->ip);
     skb->mac_header      = PTR(&wire->ip) - PTR(skb->head);
     skb->network_header  = PTR(&wire->ip) - PTR(skb->head);
-    skb->len = sizeof(wire->ip)
-             + sizeof(wire->tcp)
-             + size;
+    skb->len = ipSize;
     skb->mac_len = 0;
     skb->ip_summed = CHECKSUM_UNNECESSARY;
     skb->csum_valid = 1;
