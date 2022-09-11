@@ -304,7 +304,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(PTR(&wire->ip) + 28, ipSize - 28) != BE32(*(u32*)(PTR(&wire->ip) + ipSize)))
+    if (xsock_in_decrypt(PTR(&wire->ip) + 28, ipSize - 28)
+         != BE32(*(u32*)(PTR(&wire->ip) +     ipSize)))
         goto drop;
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
