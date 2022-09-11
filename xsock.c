@@ -692,18 +692,23 @@ static int __init xsock_init (void) {
 
             if (itfc) { // TODO: FIXME: VAI TER QUE USAR O rx_handler_data COMO USAGE COUNT
 
-                printk("XSOCK: HOST %u: PATH %u: INTERFACE HOOKING %s\n", hid, pid, itfc->name);
-                
+                printk("XSOCK: HOST %u: PATH %u: INTERFACE HOOKING %s\n",
+                    hid, pid, itfc->name);
+
                 rtnl_lock();
 
                 // HOOK INTERFACE
                 if (rcu_dereference(itfc->rx_handler) != xsock_in) {
                     // NOT HOOKED YET
-                    if (!netdev_rx_handler_register(itfc, xsock_in, NULL))
+                    if (!netdev_rx_handler_register(itfc, xsock_in, NULL)) {
                         // HOOK SUCCESS
+                        //itfc->usage = 1;
                         path->itfc = itfc;
-                } else // ALREADY HOOKED
+                    }
+                } else { // ALREADY HOOKED
+                    //itfc->usage++;
                     path->itfc = itfc;
+                }
 
                 rtnl_unlock();
 
@@ -738,23 +743,27 @@ static void __exit xsock_exit (void) {
     foreach (hid, XSOCK_HOSTS_N) {
 
         xsock_host_s* const host = &hosts[hid];
+#else
+        const uint hid = XSOCK_HOST_ID;
 #endif
         foreach (pid, XSOCK_PATHS_N) {
 
             net_device_s* itfc = host->paths[pid].itfc;
 
             if (itfc) {
+
+                printk("XSOCK: HOST %u: PATH %u: INTERFACE UNHOOKING %s\n",
+                    hid, pid, itfc->name);
+
                 rtnl_lock();
-                if (rcu_dereference(itfc->rx_handler) == xsock_in) {
-                    printk("XSOCK: INTERFACE %s: UNHOOKING\n", itfc->name);
+
+                if (rcu_dereference(itfc->rx_handler) == xsock_in)
                     netdev_rx_handler_unregister(itfc);
-                    itfc->hard_header_len -= sizeof(xsock_path_s) - ETH_HLEN;
-                    itfc->min_header_len  -= sizeof(xsock_path_s) - ETH_HLEN;
-                } else
-                    itfc = NULL;
+
                 rtnl_unlock();
-                if (itfc)
-                    dev_put(itfc);
+
+                // O PATH NAO SE REFERE MAIS A ESSA INTERFACE
+                dev_put(itfc);
             }
         }
 #if XSOCK_SERVER
