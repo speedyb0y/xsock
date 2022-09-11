@@ -414,7 +414,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     //
     if (wire->tcp.flags & XSOCK_WIRE_TCP_SYN) {
 #if !XSOCK_SERVER // THE CLIENT USES AN ETHEMERAL PORT
-        conn->lport = wire->tcp.dst;
+        conn->lport = wire->tcp.src;
 #endif
         conn->cdown = 2*XSOCK_PATHS_N;
     }

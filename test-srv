@@ -13,6 +13,8 @@ echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
 # TODO: FIXME: REMOVE O BBR
 # TODO: FIXME: REMOVE AQUELE SCALING
 
+tc qdisc  replace dev enp1s0 root pfifo_fast
+
 ip link set dev xsock up
 
 ip -4 addr add dev xsock 172.16.0.0

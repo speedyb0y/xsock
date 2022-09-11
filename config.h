@@ -4,21 +4,21 @@
 #define VPS_C 128
 #define VPS_D 121
 
-#define MYHOST 20
-#define ITFC0 "eth0"
-#define ITFC1 "eth0"
-#define ITFC2 "eth0"
-#define MAC0 "\xd0\x50\x99\xae\xde\x92"
-#define MAC1 "\xd0\x50\x99\xae\xde\x92"
-#define MAC2 "\xd0\x50\x99\xae\xde\x92"
-
-//#define MYHOST 50
+//#define MYHOST 20
 //#define ITFC0 "eth0"
-//#define ITFC1 "eth1"
-//#define ITFC2 "eth2"
-//#define MAC0 "\xe8\xde\x27\xa6\xd2\x3a"
-//#define MAC1 "\xbc\x5f\xf4\xf9\xe6\x66"
-//#define MAC2 "\xbc\x5f\xf4\xf9\xe6\x67"
+//#define ITFC1 "eth0"
+//#define ITFC2 "eth0"
+//#define MAC0 "\xd0\x50\x99\xae\xde\x92"
+//#define MAC1 "\xd0\x50\x99\xae\xde\x92"
+//#define MAC2 "\xd0\x50\x99\xae\xde\x92"
+
+#define MYHOST 50
+#define ITFC0 "eth0"
+#define ITFC1 "eth1"
+#define ITFC2 "eth2"
+#define MAC0 "\xe8\xde\x27\xa6\xd2\x3a"
+#define MAC1 "\xbc\x5f\xf4\xf9\xe6\x66"
+#define MAC2 "\xbc\x5f\xf4\xf9\xe6\x67"
 
 // -------
 
