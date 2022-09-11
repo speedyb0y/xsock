@@ -8,11 +8,17 @@
 #define MAC0 "\xd0\x50\x99\x10\x10\x10"
 #define MAC1 "\xd0\x50\x99\x11\x11\x11"
 #define MAC2 "\xd0\x50\x99\x12\x12\x12"
+#define ITFC0 "isp-0"
+#define ITFC1 "isp-1"
+#define ITFC2 "isp-2"
 
 //#define MYHOST 50
 //#define MAC0 "\xe8\xde\x27\xa6\xd2\x3a"
 //#define MAC1 "\xbc\x5f\xf4\xf9\xe6\x66"
 //#define MAC2 "\xbc\x5f\xf4\xf9\xe6\x67"
+//#define ITFC0 "eth0"
+//#define ITFC1 "eth1"
+//#define ITFC2 "eth2"
 
 // -----
 
@@ -30,7 +36,7 @@
 #define XCONF_XSOCK_SRV_PATH_1_PKTS 500000
 #define XCONF_XSOCK_SRV_PATH_2_PKTS 500000
 
-#define XCONF_XSOCK_CLT_PATH_0_ITFC "eth0"
+#define XCONF_XSOCK_CLT_PATH_0_ITFC ITFC0
 #define XCONF_XSOCK_CLT_PATH_0_ADDR_0 192
 #define XCONF_XSOCK_CLT_PATH_0_ADDR_1 168
 #define XCONF_XSOCK_CLT_PATH_0_ADDR_2 0
@@ -38,7 +44,7 @@
 #define XCONF_XSOCK_CLT_PATH_0_MAC MAC0
 #define XCONF_XSOCK_CLT_PATH_0_GW  "\x54\x9f\x06\xf4\xc7\xa0"
 
-#define XCONF_XSOCK_CLT_PATH_1_ITFC "eth1"
+#define XCONF_XSOCK_CLT_PATH_1_ITFC ITFC1
 #define XCONF_XSOCK_CLT_PATH_1_ADDR_0 192
 #define XCONF_XSOCK_CLT_PATH_1_ADDR_1 168
 #define XCONF_XSOCK_CLT_PATH_1_ADDR_2 100
@@ -46,7 +52,7 @@
 #define XCONF_XSOCK_CLT_PATH_1_MAC MAC1
 #define XCONF_XSOCK_CLT_PATH_1_GW  "\xcc\xed\x21\x96\x99\xc0"
 
-#define XCONF_XSOCK_CLT_PATH_2_ITFC "eth2"
+#define XCONF_XSOCK_CLT_PATH_2_ITFC ITFC2
 #define XCONF_XSOCK_CLT_PATH_2_ADDR_0 192
 #define XCONF_XSOCK_CLT_PATH_2_ADDR_1 168
 #define XCONF_XSOCK_CLT_PATH_2_ADDR_2 1
