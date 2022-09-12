@@ -379,7 +379,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->tcp.seq     = wire->udp.seq;
     wire->tcp.urgent  = 0;
 #if XSOCK_SERVER
-    wire->tcp.src     = BE16(XSOCK_PORT + cid);
+    wire->tcp.src     = BE16(cid);
     wire->tcp.dst     = BE16(XSOCK_PORT);
     wire->ip.src32    = BE32(ADDR_CLT + hid);
     wire->ip.dst32    = BE32(ADDR_SRV);
