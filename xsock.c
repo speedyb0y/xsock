@@ -187,14 +187,14 @@ typedef struct xsock_path_s {
 } xsock_path_s;
 
 // EXPECTED SIZE
-#define XSOCK_CONN_SIZE 32
+#define XSOCK_CONN_SIZE 24
 
 typedef struct xsock_conn_s {
-    const xsock_path_s* path;
+    u32 pkts;
+    u16 cdown;
+    u16 pid;
     u64 burst; //
     u64 limit;
-    u32 pkts;
-    u32 cdown;
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
@@ -219,9 +219,8 @@ typedef struct xsock_cfg_s {
     xsock_cfg_path_s srv[XSOCK_PATHS_N];
 } xsock_cfg_s;
 
-#define PID(path) ((path) - host->paths)
-
 static net_device_s* xdev;
+
 #if XSOCK_SERVER
 static xsock_host_s hosts[XSOCK_HOSTS_N];
 #else
@@ -458,7 +457,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         conn->pkts = 0;
     }
 
-    const xsock_path_s* path = conn->path;
+uint pid = conn->pid;
+    const xsock_path_s* path = &host->paths[pid];
 
     const u64 now = jiffies;
 
@@ -480,7 +480,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                 // NENHUM PATH DISPONÍVEL
                 goto drop;
             // GO TO NEXT PATH
-            path = &host->paths[((PID(path)) + 1) % XSOCK_PATHS_N];
+            path = &host->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
         } while (!(
             path->oPkts
 #if XSOCK_SERVER
@@ -491,8 +491,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         ));
 
         //
-        if (conn->path !=       path) {
-            conn->path  =       path;
+        if (conn->pid !=        pid) {
+            conn->pid  =        pid;
             conn->pkts  =       path->oPkts;
             conn->limit = now + path->oTime*HZ;
         }
@@ -510,11 +510,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->udp.size    = BE16(ipSize - 20);
            wire->udp.cksum   = 0;
 #if XSOCK_SERVER
-           wire->udp.src     = BE16(PORT(hid, PID(path)));
+           wire->udp.src     = BE16(PORT(hid, pid));
            wire->udp.dst     = path->cport; // THE CLIENT IS BEHIND NAT
 #else
            wire->udp.src     = BE16(XSOCK_PORT);
-           wire->udp.dst     = BE16(PORT(XSOCK_HOST_ID, PID(path)));
+           wire->udp.dst     = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
            wire->ip.src32    = path->saddr32;
            wire->ip.dst32    = path->daddr32;
@@ -653,7 +653,7 @@ static int __init xsock_init (void) {
 
             xsock_conn_s* const conn = &host->conns[cid];
 
-            conn->path   = &host->paths[0];
+            conn->pid    = 0;
             conn->burst  = 0;
             conn->limit  = 0;
             conn->pkts   = 0;
