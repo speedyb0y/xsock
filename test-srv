@@ -2,7 +2,7 @@
 
 ISP_MTU=1492
 
-(make && insmod xsock-srv.ko)
+#(make && insmod xsock-srv.ko)
 
 #echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
@@ -19,4 +19,7 @@ echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
 ip link set dev xsock up
 
 ip -4 addr add dev xsock 172.16.0.0/24 noprefixroute
-ip -4 route add dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 172.16.0.0 172.16.0.0/24 rtt 210ms rto_min 400ms
+ip -4 rule add priority 2 table 5 to 172.16.0.0/24
+ip -4 rule add priority 3 table 5 from 172.16.0.0/24
+ip -4 rule add priority 4 table 5 oif xsock
+ip -4 route add table 5 dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 172.16.0.0 172.16.0.0/24 rtt 210ms rto_min 400ms
