@@ -78,12 +78,6 @@ typedef struct net_device_ops net_device_ops_s;
 #error "BAD XSOCK_PATHS_N"
 #endif
 
-#if !XSOCK_SERVER
-#if ! (0 <= XSOCK_HOST_ID && XSOCK_HOST_ID < XSOCK_HOSTS_N)
-#define "BAD XSOCK_HOST_ID"
-#endif
-#endif
-
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE HOST AND PATH
 #define PORT(hid, pid) (XSOCK_PORT + (hid)*10 + (pid))
 #define PORT_HID(port) (((port) - XSOCK_PORT) / 10)
@@ -99,6 +93,12 @@ typedef struct net_device_ops net_device_ops_s;
 
 #define ADDR_SRV 0xAC100000U // 172.16.0.0
 #define ADDR_CLT 0xAC100001U // 172.16.0.1
+
+#if XSOCK_SERVER
+#define printk_host(msg, ...) printk("XSOCK: HOST: %u " msg, hid, ##__VA_ARGS__)
+#else
+#define printk_host(msg, ...) printk("XSOCK: " msg, ##__VA_ARGS__)
+#endif
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE CACHE_LINE_SIZE
@@ -366,10 +366,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->daddr32 = wire->ip.src32;
                  path->cport   = wire->udp.src;
 
-        printk("XSOCK: HOST %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
+        printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
-            hid, pid, (uintll)path->iHash, path->itfc->name,
+            pid, (uintll)path->iHash, path->itfc->name,
             _MAC(path->mac), _IP4(path->saddr), BE16(wire->udp.dst),
             _MAC(path->gw),  _IP4(path->daddr), BE16(path->cport));
     }
@@ -651,10 +651,8 @@ static int __init xsock_init (void) {
     foreach (hid, XSOCK_HOSTS_N) {
 
         xsock_host_s* const host = &hosts[hid];
-#else
-        const uint hid = XSOCK_HOST_ID;
 #endif
-        printk("XSOCK: HOST %u: INITIALIZING\n", hid);
+        printk_host("INITIALIZING\n");
 
         // INITIALIZE CONNECTIONS
         foreach (cid, XSOCK_CONNS_N) {
@@ -680,10 +678,10 @@ static int __init xsock_init (void) {
             const xsock_cfg_path_s* const this = &cfg.clt[pid];
             const xsock_cfg_path_s* const peer = &cfg.srv[pid];
 #endif
-            printk("XSOCK: HOST %u: PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up %us IN TIMEOUT %us ITFC %s"
+            printk_host("PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up %us IN TIMEOUT %us ITFC %s"
                 " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
                 " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
-                hid, pid,
+                pid,
                 this->oBurst,
                 this->oPkts,
                 this->oTime,
@@ -716,8 +714,7 @@ static int __init xsock_init (void) {
 
             if (itfc) { // TODO: FIXME: VAI TER QUE USAR O rx_handler_data COMO USAGE COUNT
 
-                printk("XSOCK: HOST %u: PATH %u: INTERFACE HOOKING %s\n",
-                    hid, pid, itfc->name);
+                printk_host("PATH %u: INTERFACE HOOKING %s\n", pid, itfc->name);
 
                 rtnl_lock();
 
@@ -737,13 +734,13 @@ static int __init xsock_init (void) {
                 rtnl_unlock();
 
                 if (path->itfc)
-                    printk("XSOCK: HOST %u: PATH %u: INTERFACE HOOKED\n", hid, pid);
+                    printk_host("PATH %u: INTERFACE HOOKED\n", pid);
                 else { // TODO: LEMBRAR O NOME ENTÃO - APONTAR PARA O CONFIG?
-                    printk("XSOCK: HOST %u: PATH %u: INTERFACE NOT HOOKED\n", hid, pid);
+                    printk_host("PATH %u: INTERFACE NOT HOOKED\n", pid);
                     dev_put(itfc);
                 }
             } else
-                printk("XSOCK: HOST %u: PATH %u: INTERFACE NOT FOUND\n", hid, pid);
+                printk_host("PATH %u: INTERFACE NOT FOUND\n", pid);
         }
 #if XSOCK_SERVER
     }
@@ -767,8 +764,6 @@ static void __exit xsock_exit (void) {
     foreach (hid, XSOCK_HOSTS_N) {
 
         xsock_host_s* const host = &hosts[hid];
-#else
-        const uint hid = XSOCK_HOST_ID;
 #endif
         foreach (pid, XSOCK_PATHS_N) {
 
@@ -776,8 +771,7 @@ static void __exit xsock_exit (void) {
 
             if (itfc) {
 
-                printk("XSOCK: HOST %u: PATH %u: INTERFACE UNHOOKING %s\n",
-                    hid, pid, itfc->name);
+                printk_host("PATH %u: INTERFACE UNHOOKING %s\n", pid, itfc->name);
 
                 rtnl_lock();
 
