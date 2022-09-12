@@ -93,8 +93,8 @@ typedef struct net_device_ops net_device_ops_s;
 // 0xFFFF + 1
 #define XSOCK_CONNS_N 65536
 
-#define ADDR_SRV 0xAC100000U // 172.16.0.0
-#define ADDR_CLT 0xAC100001U // 172.16.0.1
+#define ADDR_SRV 0xC0000000U // 192.0.0.0
+#define ADDR_CLT 0xC0000001U // 192.0.0.1
 
 #if XSOCK_SERVER
 #define printk_host(msg, ...) printk("XSOCK: HOST: %u " msg, hid, ##__VA_ARGS__)
@@ -606,7 +606,6 @@ static void xsock_setup (net_device_s* const dev) {
         ;
     dev->features        =
     dev->hw_features     = NETIF_F_IP_CSUM
-                         | NETIF_F_IPV6_CSUM
                          | NETIF_F_RXCSUM
                          | NETIF_F_HW_CSUM
         ;

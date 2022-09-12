@@ -14,11 +14,11 @@ ip link set dev xsock up
 
 ISP_MTU=1492
 
-ip -4 rule add priority 10 table ${TABLE_XSOCK} to 172.16.0.0
-ip -4 rule add priority 10 table ${TABLE_XSOCK} from 172.16.0.1
+ip -4 rule add priority 10 table ${TABLE_XSOCK} to 192.0.0.0
+ip -4 rule add priority 10 table ${TABLE_XSOCK} from 192.0.0.1
 ip -4 rule add priority 10 table ${TABLE_XSOCK} oif xsock
-ip -4 addr add dev xsock 172.16.0.1
+ip -4 addr add dev xsock 192.0.0.1
 #rttvar TIME (Linux 2.3.15+ only)
 #ssthresh NUMBER (Linux 2.3.15+ only)
-ip -4 route add table ${TABLE_XSOCK} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 172.16.0.1 172.16.0.0 rtt 210ms rto_min 400ms
+ip -4 route add table ${TABLE_XSOCK} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 192.0.0.1 192.0.0.0 rtt 210ms rto_min 320ms
 ip -4 route flush cache
