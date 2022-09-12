@@ -169,21 +169,25 @@ typedef struct xsock_wire_s {
 
 typedef struct xsock_path_s {
     net_device_s* itfc;
-#if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
-    u32 cport;
-    u32 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
-    u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
-    u64 iHash; // THE PATH HASH
-#else
-    u64 reserved0;
-    u64 reserved1;
-    u64 reserved2;
-#endif
     u32 oBurst; // QUANTO TEMPO (EM JIFFIES) CONSIDERAR NOVOS PACOTES PARTES DO MESMO BURST E PORTANTO PERMANECER NESTE PATH
     u32 oPkts; // MÁXIMO DE PACOTES A ENVIAR ATÉ PASSAR PARA OUTRO PATH
     u32 oTime; // MÁXIMO DE TEMPO (EM SEGUNDOS) ATÉ PASSAR PARA OUTRO PATH
-    u8  gw [ETH_ALEN];
-    u8  mac[ETH_ALEN];
+#if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
+    u32 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
+    u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
+    u64 iHash; // THE PATH HASH
+    u16 cport;
+#else
+    u32 reserved0;
+    u64 reserved1;
+    u64 reserved2;
+    u16 reserved3;
+#endif
+    struct xsock_path_eth_s {
+        u8  gw [ETH_ALEN];
+        u8  mac[ETH_ALEN];
+        u16 type;
+    } eth;
     union { u8 saddr[4]; u32 saddr32; };
     union { u8 daddr[4]; u32 daddr32; };
 } xsock_path_s;
@@ -351,18 +355,19 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-          memcpy(path->gw,       wire->eth.src, ETH_ALEN);
-          memcpy(path->mac,      wire->eth.dst, ETH_ALEN);
-                 path->saddr32 = wire->ip.dst32;
-                 path->daddr32 = wire->ip.src32;
-                 path->cport   = wire->udp.src;
+          memcpy(path->eth.gw,    wire->eth.src, ETH_ALEN);
+          memcpy(path->eth.mac,   wire->eth.dst, ETH_ALEN);
+                 path->eth.type = wire->eth.type;
+                 path->saddr32  = wire->ip.dst32;
+                 path->daddr32  = wire->ip.src32;
+                 path->cport    = wire->udp.src;
 
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->mac), _IP4(path->saddr), BE16(wire->udp.dst),
-            _MAC(path->gw),  _IP4(path->daddr), BE16(path->cport));
+            _MAC(path->eth.mac), _IP4(path->saddr), BE16(wire->udp.dst),
+            _MAC(path->eth.gw),  _IP4(path->daddr), BE16(path->cport));
     }
 #endif
 
@@ -525,9 +530,7 @@ uint pid = conn->pid;
            wire->ip.protocol = IPPROTO_UDP;
            wire->ip.cksum    = 0;
            wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
-    memcpy(wire->eth.dst,      path->gw,  ETH_ALEN);
-    memcpy(wire->eth.src,      path->mac, ETH_ALEN);
-           wire->eth.type    = BE16(ETH_P_IP);
+   memcpy(&wire->eth,         &path->eth,  ETH_HLEN);
 
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t)) =
@@ -616,7 +619,7 @@ static int __init xsock_init (void) {
 #else
     printk("XSOCK: CLIENT INIT\n");
 #endif
-
+    BUILD_BUG_ON(sizeof(struct xsock_path_eth_s) != ETH_HLEN);
     BUILD_BUG_ON(sizeof(struct xsock_wire_eth_s) != ETH_HLEN);
     BUILD_BUG_ON(sizeof(struct xsock_wire_ip_s) != sizeof(struct iphdr));
     BUILD_BUG_ON(sizeof(struct xsock_wire_tcp_s) != sizeof(struct tcphdr));
@@ -701,8 +704,9 @@ static int __init xsock_init (void) {
             path->reserved1 = 0;
             path->reserved2 = 0;
 #endif
-     memcpy(path->mac,        this->mac, ETH_ALEN);
-     memcpy(path->gw,         this->gw,  ETH_ALEN);
+     memcpy(path->eth.mac,    this->mac, ETH_ALEN);
+     memcpy(path->eth.gw,     this->gw,  ETH_ALEN);
+            path->eth.type    = BE16(ETH_P_IP);
      memcpy(path->saddr,      this->addr, 4);
      memcpy(path->daddr,      peer->addr, 4);
 
@@ -793,6 +797,7 @@ MODULE_AUTHOR("speedyb0y");
 MODULE_DESCRIPTION("XSOCK");
 MODULE_VERSION("0.1");
 
+memset
 /*
 TODO: RETIRAR TAIS PORTAS DOS EPHEMERAL PORTS
 
