@@ -430,6 +430,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
      || wire->ip.src32   != BE32(ADDR_SRV)
      || wire->tcp.src    != BE16(XSOCK_PORT)
 #else
+     //|| wire->ip.src32   != BE32(ADDR_CLT + XSOCK_HOST_ID)
      || wire->ip.dst32   != BE32(ADDR_SRV)
      || wire->tcp.dst    != BE16(XSOCK_PORT)
 #endif

@@ -15,6 +15,8 @@ echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
 
 tc qdisc  replace dev enp1s0 root pfifo_fast
 
+ip link set dev enp1s0 txqueuelen 65536
+
 ip link set dev xsock up
 
 ip -4 addr add dev xsock 172.16.0.0/24 noprefixroute
