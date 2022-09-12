@@ -527,7 +527,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
     skb->transport_header = PTR(&wire->udp) - PTR(skb->head);
-    skb->len              = sizeof(wire->eth) + ipSize;
+    skb->len              = ETH_HLEN + ipSize;
     skb->mac_len          = ETH_HLEN;
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
