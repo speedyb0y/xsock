@@ -605,8 +605,7 @@ static void xsock_setup (net_device_s* const dev) {
                          | IFF_LIVE_RENAME_OK
         ;
     dev->features        =
-    dev->hw_features     = NETIF_F_IP_CSUM
-                         | NETIF_F_RXCSUM
+    dev->hw_features     = NETIF_F_RXCSUM
                          | NETIF_F_HW_CSUM
         ;
 }
@@ -645,9 +644,9 @@ static int __init xsock_init (void) {
     xdev = dev;
 
 #if XSOCK_SERVER
-	memset(hosts, 0, sizeof(hosts));
+    memset(hosts, 0, sizeof(hosts));
 #else
-	memset(host, 0, sizeof(host));
+    memset(host, 0, sizeof(host));
 #endif
 
     // INITIALIZE HOSTS
@@ -659,11 +658,11 @@ static int __init xsock_init (void) {
         printk_host("INITIALIZING\n");
 
         // INITIALIZE CONNECTIONS
-		// conn[*].pid
-		// conn[*].burst
-		// conn[*].limit     ---> 0
-		// conn[*].pkts
-		// conn[*].cdown
+        // conn[*].pid
+        // conn[*].burst
+        // conn[*].limit     ---> 0
+        // conn[*].pkts
+        // conn[*].cdown
 
         // INITIALIZE PATHS
         foreach (pid, XSOCK_PATHS_N) {
