@@ -150,19 +150,15 @@ typedef struct xsock_wire_s {
             u32 ack;
             u16 flags;
             u16 window;
-            u16 cksum;
-            u16 urgent;
+            u32 seq2; // CHECKSUM & URGENT
         } tcp;
-        struct xsock_wire_udp_s { // AS FAKE UDP
-            u16 src;
-            u16 dst;
-            u16 size;
-            u16 cksum;
-            u32 ack;
-            u16 flags;
-            u16 window;
-            u32 seq;
-        } udp;
+		struct xsock_wire_udp_s { // AS FAKE UDP
+			u16 src;
+			u16 dst;
+			u16 size;
+			u16 cksum;
+			u8 pld[12];			
+		} udp;
     };
 } xsock_wire_s;
 
@@ -332,15 +328,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(
-            PTR(&wire->ip)
-                + sizeof(struct iphdr)
-                + sizeof(struct udphdr),
-            ipSize
-                - sizeof(struct iphdr)
-                - sizeof(struct udphdr)
-            )
-        != BE32(*wire_hash(wire, ipSize)))
+    if (xsock_in_decrypt(PTR(&wire->udp.pld), ipSize
+                - sizeof(wire->ip)
+                - sizeof(wire->udp)
+                + sizeof(wire->udp.pld)
+        ) != BE32(*wire_hash(wire, ipSize)))
         goto drop;
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
@@ -376,23 +368,26 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
-    wire->tcp.seq     = wire->udp.seq;
-    wire->tcp.urgent  = 0;
-#if XSOCK_SERVER
-    wire->tcp.src     = BE16(cid);
-    wire->tcp.dst     = BE16(XSOCK_PORT);
-    wire->ip.src32    = BE32(ADDR_CLT + hid);
-    wire->ip.dst32    = BE32(ADDR_SRV);
-#else
-    wire->tcp.src     = BE16(XSOCK_PORT);
-    wire->tcp.dst     = BE16(cid);
-    wire->ip.src32    = BE32(ADDR_SRV);
-    wire->ip.dst32    = BE32(ADDR_CLT + hid);
-#endif
     wire->ip.protocol = IPPROTO_TCP;
     wire->ip.size     = BE16(ipSize);
     wire->ip.cksum    = 0;
+#if XSOCK_SERVER
+    wire->ip.src32    = BE32(ADDR_CLT + hid);
+    wire->ip.dst32    = BE32(ADDR_SRV);
+#else
+    wire->ip.src32    = BE32(ADDR_SRV);
+    wire->ip.dst32    = BE32(ADDR_CLT + hid);
+#endif
     wire->ip.cksum    = ip_fast_csum(PTR(&wire->ip), 5);
+#if XSOCK_SERVER
+    wire->tcp.src     = BE16(cid);
+    wire->tcp.dst     = BE16(XSOCK_PORT);
+#else
+    wire->tcp.src     = BE16(XSOCK_PORT);
+    wire->tcp.dst     = BE16(cid);
+#endif
+    wire->tcp.seq     = wire->tcp.seq2;
+    wire->tcp.seq2    = 0;
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = PTR(&wire->ip);
@@ -510,7 +505,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const uint ipSize = BE16(wire->ip.size) + sizeof(wire_hash_t);
 
     // RE-ENCAPSULATE
-           wire->udp.seq     = wire->tcp.seq;
+    // SALVA ANTES DE SOBRESCREVER
+           wire->tcp.seq2    = wire->tcp.seq;
            wire->udp.size    = BE16(ipSize - 20);
            wire->udp.cksum   = 0;
 #if XSOCK_SERVER
@@ -533,15 +529,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t)) =
-        BE32(xsock_out_encrypt(
-            PTR(&wire->ip)
-                + sizeof(struct iphdr)
-                + sizeof(struct udphdr),
-            ipSize
-                - sizeof(struct iphdr)
-                - sizeof(struct udphdr)
-                - sizeof(wire_hash_t))
-        );
+        BE32(xsock_out_encrypt(PTR(&wire->udp.pld), ipSize
+                - sizeof(wire->ip)
+                - sizeof(wire->udp)
+                + sizeof(wire->udp.pld)
+                - sizeof(wire_hash_t)
+        ));
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
