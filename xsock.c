@@ -259,7 +259,11 @@ static const xsock_cfg_s cfg = {
     }
 };
 
-static u32 xsock_out_encrypt (void* data, uint size) {
+typedef u32 wire_hash_t;
+
+#define wire_hash(wire, ipSizeReal) ((wire_hash_t*)(PTR(&(wire)->ip) + (ipSizeReal)))
+
+static wire_hash_t xsock_out_encrypt (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -267,7 +271,7 @@ static u32 xsock_out_encrypt (void* data, uint size) {
     return size;
 }
 
-static u32 xsock_in_decrypt (void* data, uint size) {
+static wire_hash_t xsock_in_decrypt (void* data, uint size) {
 
     (void)data;
     (void)size;
@@ -321,15 +325,22 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         return RX_HANDLER_PASS;
 
     // THE PACKET IS THE SAME EXCEPT THE HASH
-    const uint ipSize = BE16(wire->ip.size) - sizeof(u32);
+    const uint ipSize = BE16(wire->ip.size) - sizeof(wire_hash_t);
 
     // DROP INCOMPLETE PACKETS
-    if ((PTR(&wire->ip) + ipSize + sizeof(u32)) > SKB_TAIL(skb))
+    if ((PTR(&wire->ip) + ipSize + sizeof(wire_hash_t)) > SKB_TAIL(skb))
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(PTR(&wire->ip) + 28, ipSize - 28)
-         != BE32(*(u32*)(PTR(&wire->ip) +     ipSize)))
+    if (xsock_in_decrypt(
+            PTR(&wire->ip)
+                + sizeof(struct iphdr)
+                + sizeof(struct udphdr),
+            ipSize
+                - sizeof(struct iphdr)
+                - sizeof(struct udphdr)
+            )
+        != BE32(*wire_hash(wire, ipSize)))
         goto drop;
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
@@ -495,7 +506,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->burst = now + path->oBurst;
 
     // TODO: CONFIRM WE HAVE THIS FREE SPACE
-    const uint ipSize = BE16(wire->ip.size) + sizeof(u32);
+    const uint ipSize = BE16(wire->ip.size) + sizeof(wire_hash_t);
 
     // RE-ENCAPSULATE
            wire->udp.seq     = wire->tcp.seq;
@@ -520,15 +531,23 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->eth.type    = BE16(ETH_P_IP);
 
     //
-    *(u32*)(PTR(&wire->ip) +     ipSize - 4) = BE32(xsock_out_encrypt(
-            PTR(&wire->ip) + 28, ipSize - 4 - 28));
+    *wire_hash(wire, ipSize - sizeof(wire_hash_t)) =
+        BE32(xsock_out_encrypt(
+            PTR(&wire->ip)
+                + sizeof(struct iphdr)
+                + sizeof(struct udphdr),
+            ipSize
+                - sizeof(struct iphdr)
+                - sizeof(struct udphdr)
+                - sizeof(wire_hash_t))
+        );
 
     skb->data             = PTR(&wire->eth);
     skb->mac_header       = PTR(&wire->eth) - PTR(skb->head);
     skb->network_header   = PTR(&wire->ip)  - PTR(skb->head);
     skb->transport_header = PTR(&wire->udp) - PTR(skb->head);
-    skb->len              = ETH_HLEN + ipSize;
     skb->mac_len          = ETH_HLEN;
+    skb->len              = ETH_HLEN + ipSize;
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
 
