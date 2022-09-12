@@ -31,6 +31,8 @@ typedef struct net net_s;
 typedef struct header_ops header_ops_s;
 typedef struct net_device_ops net_device_ops_s;
 
+#define SKB_DATA(skb) PTR((skb)->data)
+#define SKB_HEAD(skb) PTR((skb)->head)
 #define SKB_TAIL(skb) PTR(skb_tail_pointer(skb))
 
 #define PTR(p) ((void*)(p))
@@ -285,17 +287,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = PTR(skb->data)
-                          + sizeof(wire->ip)
-                          + sizeof(wire->udp)
-                         - sizeof(*wire);
+    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, ip);
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
-    if ((PTR(wire) + sizeof(*wire)) > SKB_TAIL(skb)
-          || wire->eth.type    != BE16(ETH_P_IP)
-          || wire->ip.version  != 0x45
-          || wire->ip.protocol != IPPROTO_UDP)
+    if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
+    || PTR(&wire->eth) < SKB_HEAD(skb)
+         || wire->eth.type    != BE16(ETH_P_IP)
+         || wire->ip.version  != 0x45
+         || wire->ip.protocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
 
     // IDENTIFY HOST, PATH AND CONN
@@ -398,6 +398,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->csum_valid = 1;
     skb->dev = xdev;
 
+    *pskb = skb;
+
     return RX_HANDLER_ANOTHER;
 
 drop:
@@ -419,14 +421,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
        - sizeof(*wire);
 
     if (PTR(&wire->eth) < PTR(skb->head)
-     || wire->ip.protocol != IPPROTO_TCP
+          || wire->ip.protocol != IPPROTO_TCP
 #if XSOCK_SERVER
-     || wire->ip.src32   != BE32(ADDR_SRV)
-     || wire->tcp.src    != BE16(XSOCK_PORT)
+          || wire->ip.src32   != BE32(ADDR_SRV)
+          || wire->tcp.src    != BE16(XSOCK_PORT)
 #else
-     //|| wire->ip.src32   != BE32(ADDR_CLT + XSOCK_HOST_ID)
-     || wire->ip.dst32   != BE32(ADDR_SRV)
-     || wire->tcp.dst    != BE16(XSOCK_PORT)
+          //|| wire->ip.src32   != BE32(ADDR_CLT + XSOCK_HOST_ID)
+          || wire->ip.dst32   != BE32(ADDR_SRV)
+          || wire->tcp.dst    != BE16(XSOCK_PORT)
 #endif
     )
         goto drop;
