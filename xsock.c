@@ -645,6 +645,12 @@ static int __init xsock_init (void) {
 
     xdev = dev;
 
+#if XSOCK_SERVER
+	memset(hosts, 0, sizeof(hosts));
+#else
+	memset(host, 0, sizeof(host));
+#endif
+
     // INITIALIZE HOSTS
 #if XSOCK_SERVER
     foreach (hid, XSOCK_HOSTS_N) {
@@ -654,18 +660,13 @@ static int __init xsock_init (void) {
         printk_host("INITIALIZING\n");
 
         // INITIALIZE CONNECTIONS
-        foreach (cid, XSOCK_CONNS_N) {
+		// conn[*].pid
+		// conn[*].burst
+		// conn[*].limit     ---> 0
+		// conn[*].pkts
+		// conn[*].cdown
 
-            xsock_conn_s* const conn = &host->conns[cid];
-
-            conn->pid    = 0;
-            conn->burst  = 0;
-            conn->limit  = 0;
-            conn->pkts   = 0;
-            conn->cdown  = 0;
-        }
-
-        // INITIALIZE ITS PATHS
+        // INITIALIZE PATHS
         foreach (pid, XSOCK_PATHS_N) {
 
             xsock_path_s* const path = &host->paths[pid];
@@ -797,7 +798,6 @@ MODULE_AUTHOR("speedyb0y");
 MODULE_DESCRIPTION("XSOCK");
 MODULE_VERSION("0.1");
 
-memset
 /*
 TODO: RETIRAR TAIS PORTAS DOS EPHEMERAL PORTS
 
@@ -811,4 +811,4 @@ e no transmit
 o header nao pode ser CONST!!!
 */
 
-// TODO: NAO CALCULAR O HASH IP E TCP ANTES DE PASSAR PARA A INTERFACE XGW
+// TODO: NAO CALCULAR O CHECKSUM IP E TCP ANTES DE PASSAR PARA A INTERFACE XGW
