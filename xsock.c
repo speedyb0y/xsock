@@ -293,9 +293,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
     if ((PTR(wire) + sizeof(*wire)) > SKB_TAIL(skb)
-     || wire->eth.type    != BE16(ETH_P_IP)
-     || wire->ip.version  != 0x45
-     || wire->ip.protocol != IPPROTO_UDP)
+          || wire->eth.type    != BE16(ETH_P_IP)
+          || wire->ip.version  != 0x45
+          || wire->ip.protocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
 
     // IDENTIFY HOST, PATH AND CONN
