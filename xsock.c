@@ -152,13 +152,13 @@ typedef struct xsock_wire_s {
             u16 window;
             u32 seq2; // CHECKSUM & URGENT
         } tcp;
-		struct xsock_wire_udp_s { // AS FAKE UDP
-			u16 src;
-			u16 dst;
-			u16 size;
-			u16 cksum;
-			u8 pld[12];			
-		} udp;
+        struct xsock_wire_udp_s { // AS FAKE UDP
+            u16 src;
+            u16 dst;
+            u16 size;
+            u16 cksum;
+            u8 pld[12];
+        } udp;
     };
 } xsock_wire_s;
 
