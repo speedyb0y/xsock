@@ -147,7 +147,7 @@ typedef struct xsock_wire_s {
     u16 uSrc;
     u16 uDst;
     union {
-        u32 tSeq;
+            u32 tSeq;
         struct {
             u16 uSize;
             u16 uChecksum;
@@ -160,7 +160,7 @@ typedef struct xsock_wire_s {
             u16 tWindow;
             u32 tSeq2; // CHECKSUM & URGENT
         };
-        u16 uPayload[6]; // AS FAKE UDP
+            u16 uPayload[6]; // AS FAKE UDP
     };
 } xsock_wire_s;
 
