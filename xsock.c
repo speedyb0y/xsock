@@ -367,8 +367,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->cport   = wire->udp.src;
 
         printk("XSOCK: HOST %u: PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
-            " SRC %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
-            " DST %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
+            " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
+            " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             hid, pid, (uintll)path->iHash, path->itfc->name,
             _MAC(path->mac), _IP4(path->saddr), BE16(wire->udp.dst),
             _MAC(path->gw),  _IP4(path->daddr), BE16(path->cport));
