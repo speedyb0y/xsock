@@ -1,6 +1,6 @@
 /*
 
-    TODO: mixed HW and IP checksum settings.
+    TODO: RETIRAR TAIS PORTAS DOS EPHEMERAL PORTS
     TODO: NO CLIENTE, VAI TER QUE ALTERAR A PORTA DE TEMPOS EM TEMPOS SE NAO ESTIVER FUNCIONANDO
 */
 
@@ -688,19 +688,6 @@ static int __init xsock_init (void) {
             const xsock_cfg_path_s* const this = &cfg.clt[pid];
             const xsock_cfg_path_s* const peer = &cfg.srv[pid];
 #endif
-            printk_host("PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up IN TIMEOUT %us ITFC %s"
-                " %04X%04X%04X 0x%08X ->"
-                " %04X%04X%04X 0x%08X\n",
-                pid,
-                CONN_BURST,
-                this->oPkts,
-                this->iTimeout,
-                this->itfc,
-                _MAC(this->eSrc), _IP4(this->addr32),
-                _MAC(this->eDst), _IP4(peer->addr32)
-            );
-
-            //oPkts = this->oPkts ????;
             // PEGA A LARGURA DE BANDA POSSÍVEL EM UM SEGUNDO
             // TRANSFORMA NO NÚMERO DE PACOTES
             // MAS FAZ ISSO COM 8 BITS A MAIS DE PRECISAO:
@@ -708,7 +695,19 @@ static int __init xsock_init (void) {
             // ESTE VALOR É A QUANTIDADE DE PACOTES POR SEGUNDO.
             // DIVIDE ELE PELA QUANTIDADE DE JIFFIES EM UM SEGUNDO.
             // ESTE VALOR É A QUANTIDADE DE PACOTES QUE PODE PASSAR DURANTE UM JIFFIE.
-            const uint oPkts = (((u64)(50*1000*1000)) << O_PKTS_SHIFT) / (1500*HZ);
+            const uint oPkts = (((u64)this->oPkts) << O_PKTS_SHIFT) / (1500*HZ);
+
+            printk_host("PATH %u: INITIALIZING WITH OUT BURST %uj BANDWIDTH %u BYTES/S %u PACKETS/J  IN TIMEOUT %us ITFC %s"
+                " %04X%04X%04X 0x%08X ->"
+                " %04X%04X%04X 0x%08X\n",
+                pid,
+                CONN_BURST,
+                this->oPkts, oPkts,
+                this->iTimeout,
+                this->itfc,
+                _MAC(this->eSrc), _IP4(this->addr32),
+                _MAC(this->eDst), _IP4(peer->addr32)
+            );
 
          // path->itfc       --> NULL
          // path->oLast      --> 0
@@ -823,9 +822,6 @@ MODULE_DESCRIPTION("XSOCK");
 MODULE_VERSION("0.1");
 
 /*
-TODO: RETIRAR TAIS PORTAS DOS EPHEMERAL PORTS
-
-
 TODO: CORRIGIR O XGW
 no in
 if (skb->len <= XSOCK_PATH_SIZE_WIRE
@@ -834,5 +830,3 @@ NO IN
 e no transmit
 o header nao pode ser CONST!!!
 */
-
-// TODO: NAO CALCULAR O CHECKSUM IP E TCP ANTES DE PASSAR PARA A INTERFACE XGW
