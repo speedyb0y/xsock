@@ -373,26 +373,23 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
-    wire->iTTLProtocol = TTL_TCP;
-    wire->iSize     = BE16(ipSize);
-    wire->iChecksum = 0;
 #if XSOCK_SERVER
     wire->iAddrs[0] = BE32(ADDR_CLT + hid);
     wire->iAddrs[1] = BE32(ADDR_SRV);
+    wire-> ports[0] = BE16(cid);
+    wire-> ports[1] = BE16(XSOCK_PORT);
 #else
     wire->iAddrs[0] = BE32(ADDR_SRV);
     wire->iAddrs[1] = BE32(ADDR_CLT + hid);
+    wire-> ports[0] = BE16(XSOCK_PORT);
+    wire-> ports[1] = BE16(cid);
 #endif
+    wire->iTTLProtocol = TTL_TCP;
+    wire->iSize     = BE16(ipSize);
+    wire->iChecksum = 0;
     wire->iChecksum = ip_fast_csum(WIRE_IP(wire), 5);
-#if XSOCK_SERVER
-    wire->ports[0]     = BE16(cid);
-    wire->ports[1]     = BE16(XSOCK_PORT);
-#else
-    wire->ports[0]     = BE16(XSOCK_PORT);
-    wire->ports[1]     = BE16(cid);
-#endif
-    wire->tSeq     = wire->tSeq2;
-    wire->tSeq2    = 0;
+    wire->tSeq      = wire->tSeq2;
+    wire->tSeq2     = 0;
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = WIRE_IP(wire);
