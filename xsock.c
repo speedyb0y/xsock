@@ -132,7 +132,7 @@ typedef struct net_device_ops net_device_ops_s;
 
 #define WIRE_ETH(wire) PTR(&(wire)->eDst)
 #define WIRE_IP(wire) PTR(&(wire)->iVersionTOS)
-#define WIRE_UDP(wire) PTR(&(wire)->uSrc)
+#define WIRE_UDP(wire) PTR(&(wire)->ports)
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE 56
@@ -148,10 +148,8 @@ typedef struct xsock_wire_s {
     u16 iFrag;
     u16 iTTLProtocol;
     u16 iChecksum;
-    union { u8 iSrc[4]; u32 iSrc32; };
-    union { u8 iDst[4]; u32 iDst32; };
-    u16 uSrc;
-    u16 uDst;
+    u32 iAddrs[2];
+    u16 ports[2];
     union {
             u32 tSeq;
         struct {
@@ -310,9 +308,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // IDENTIFY HOST, PATH AND CONN
 #if XSOCK_SERVER
-    const uint srvPort = BE16(wire->uDst);
+    const uint srvPort = BE16(wire->ports[1]);
 #else
-    const uint srvPort = BE16(wire->uSrc);
+    const uint srvPort = BE16(wire->ports[0]);
 #endif
     const uint hid = PORT_HID(srvPort);
     const uint pid = PORT_PID(srvPort);
@@ -347,8 +345,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const u64 hash = (u64)(uintptr_t)skb->dev
       + *(u64*)wire->eDst // VAI PEGAR UM PEDAÇO DO eSrc
       + *(u64*)wire->eSrc // VAI PEGAR O eType
-      + *(u64*)wire->iSrc // VAI PEGAR O iDst
-      +        wire->uSrc
+      + *(u64*)wire->iAddrs // VAI PEGAR O iDst
+      +        wire->ports[0]
     ;
 
     xsock_host_s* const host = &hosts[hid];
@@ -361,15 +359,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
           memcpy(path->eDst,      wire->eSrc, ETH_ALEN);
           memcpy(path->eSrc,      wire->eDst, ETH_ALEN);
                  path->eType    = wire->eType;
-                 path->saddr32  = wire->iDst32;
-                 path->daddr32  = wire->iSrc32;
-                 path->cport    = wire->uSrc;
+                 path->saddr32  = wire->iAddrs[0];
+                 path->daddr32  = wire->iAddrs[1];
+                 path->cport    = wire->ports[0];
 
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->eSrc), _IP4(path->saddr), BE16(wire->uDst),
+            _MAC(path->eSrc), _IP4(path->saddr), BE16(wire->ports[1]),
             _MAC(path->eDst), _IP4(path->daddr), BE16(path->cport));
     }
 #endif
@@ -379,19 +377,19 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->iSize     = BE16(ipSize);
     wire->iChecksum = 0;
 #if XSOCK_SERVER
-    wire->iSrc32    = BE32(ADDR_CLT + hid);
-    wire->iDst32    = BE32(ADDR_SRV);
+    wire->iAddrs[0] = BE32(ADDR_CLT + hid);
+    wire->iAddrs[1] = BE32(ADDR_SRV);
 #else
-    wire->iSrc32    = BE32(ADDR_SRV);
-    wire->iDst32    = BE32(ADDR_CLT + hid);
+    wire->iAddrs[0] = BE32(ADDR_SRV);
+    wire->iAddrs[1] = BE32(ADDR_CLT + hid);
 #endif
     wire->iChecksum = ip_fast_csum(WIRE_IP(wire), 5);
 #if XSOCK_SERVER
-    wire->uSrc     = BE16(cid);
-    wire->uDst     = BE16(XSOCK_PORT);
+    wire->ports[0]     = BE16(cid);
+    wire->ports[1]     = BE16(XSOCK_PORT);
 #else
-    wire->uSrc     = BE16(XSOCK_PORT);
-    wire->uDst     = BE16(cid);
+    wire->ports[0]     = BE16(XSOCK_PORT);
+    wire->ports[1]     = BE16(cid);
 #endif
     wire->tSeq     = wire->tSeq2;
     wire->tSeq2    = 0;
@@ -431,18 +429,18 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (WIRE_ETH(wire) < PTR(skb->head)
           //|| wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
-          || wire->iSrc32   != BE32(ADDR_SRV)
-          || wire->uSrc    != BE16(XSOCK_PORT)
+          || wire->iAddrs[0]   != BE32(ADDR_SRV)
+          || wire->ports [0]   != BE16(XSOCK_PORT)
 #else
           //|| wire->ip.src32   != BE32(ADDR_CLT + XSOCK_HOST_ID)
-          || wire->iDst32   != BE32(ADDR_SRV)
-          || wire->uDst    != BE16(XSOCK_PORT)
+          || wire->iAddrs[1]   != BE32(ADDR_SRV)
+          || wire->ports [1]   != BE16(XSOCK_PORT)
 #endif
     )
         goto drop;
 
 #if XSOCK_SERVER
-    const uint hid = (BE32(wire->iDst32) & 0xFFU) - 1;
+    const uint hid = (BE32(wire->iAddrs[1]) & 0xFFU) - 1;
 
     if (hid >= XSOCK_HOSTS_N)
         goto drop;
@@ -451,9 +449,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #endif
 
 #if XSOCK_SERVER
-    const uint cid = BE16(wire->uDst);
+    const uint cid = BE16(wire->ports[1]);
 #else
-    const uint cid = BE16(wire->uSrc);
+    const uint cid = BE16(wire->ports[0]);
 #endif
 
     xsock_conn_s* const conn = &host->conns[cid];
@@ -520,14 +518,14 @@ uint pid = conn->pid;
            wire->uSize        = BE16(ipSize - 20);
            wire->uChecksum    = 0;
 #if XSOCK_SERVER
-           wire->uSrc         = BE16(PORT(hid, pid));
-           wire->uDst         = path->cport; // THE CLIENT IS BEHIND NAT
+           wire->ports[0]         = BE16(PORT(hid, pid));
+           wire->ports[1]         = path->cport; // THE CLIENT IS BEHIND NAT
 #else
-           wire->uSrc         = BE16(XSOCK_PORT);
-           wire->uDst         = BE16(PORT(XSOCK_HOST_ID, pid));
+           wire->ports[0]         = BE16(XSOCK_PORT);
+           wire->ports[1]         = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
-           wire->iSrc32       = path->saddr32;
-           wire->iDst32       = path->daddr32;
+           wire->iAddrs[0]    = path->saddr32;
+           wire->iAddrs[1]    = path->daddr32;
            wire->iCID         = BE16(cid);
            wire->iSize        = BE16(ipSize);
            wire->iTTLProtocol = TTL_UDP;
