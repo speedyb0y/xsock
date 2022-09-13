@@ -187,8 +187,8 @@ typedef struct xsock_path_s {
     u64 reserved1;
     u64 reserved2;
 #endif
-    u8  eDst[ETH_ALEN];
-    u8  eSrc[ETH_ALEN];
+    u16 eDst[ETH_ALEN/sizeof(u16)];
+    u16 eSrc[ETH_ALEN/sizeof(u16)];
     u16 eType;
     u16 iVersionTOS;
     u32 iAddrs[2];
