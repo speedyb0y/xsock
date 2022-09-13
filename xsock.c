@@ -424,12 +424,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = PTR(skb->data)
-        + sizeof(struct iphdr)
-        + sizeof(struct tcphdr)
-       - sizeof(*wire);
+    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
-    if (WIRE_ETH(wire) < PTR(skb->head)
+    if (WIRE_ETH(wire) < SKB_HEAD(skb)
 #if XSOCK_SERVER
           || wire->iAddrs[0] != BE32(ADDR_SRV)
           || wire-> ports[0] != BE16(XSOCK_PORT)
