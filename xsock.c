@@ -680,19 +680,19 @@ static int __init xsock_init (void) {
                 _MAC(this->gw),  _IP4(peer->addr)
             );
 
-            path->itfc      =  NULL;
+         // path->itfc      --> 0
             path->oPkts     = this->oPkts;
             path->oBurst    = this->oBurst;
             path->oTime     = this->oTime;
 #if XSOCK_SERVER
-            path->iHash     = 0;
-            path->iActive   = 0;
+         // path->iHash     --> 0
+         // path->iActive   --> 0
             path->iTimeout  = this->iTimeout;
-            path->cport     = 0;
+         // path->cport     --> 0
 #else
-            path->reserved0 = 0;
-            path->reserved1 = 0;
-            path->reserved2 = 0;
+         // path->reserved0 --> 0
+         // path->reserved1 --> 0
+         // path->reserved2 --> 0
 #endif
             path->eDst[0]     = this->eSrc[0];
             path->eDst[1]     = this->eSrc[1];
