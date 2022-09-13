@@ -380,8 +380,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->cport     = wire->ports[0];
 
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
-            " %04X%04X%04X 0x%08X %u ->"
-            " %04X%04X%04X 0x%08X %u\n",
+            " 0x%04X%04X%04X 0x%08X %u ->"
+            " 0x%04X%04X%04X 0x%08X %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
             _MAC(path->eSrc), _IP4(path->iAddrs[0]), BE16(wire->ports[1]),
             _MAC(path->eDst), _IP4(path->iAddrs[1]), BE16(path->cport));
@@ -540,7 +540,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
     //
-//printk("CONN %u conn->pid %u = pid %u | conn->cdown %u, cdown %u\n", cid, conn->pid, pid, conn->cdown, cdown);
+    if (conn->pid != pid)
+        printk("CONN %u conn->pid %u -> pid %u | conn->cdown %u -> cdown %u | path->oRemaining %u\n", cid, conn->pid, pid, conn->cdown, cdown, path->oRemaining );
     conn->pid = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
@@ -715,8 +716,8 @@ static int __init xsock_init (void) {
             const uint oPkts = (((u64)this->oPkts) << O_PKTS_SHIFT) / (1500*HZ);
 
             printk_host("PATH %u: INITIALIZING WITH OUT BURST %uj BANDWIDTH %u BYTES/S %u PACKETS/J  IN TIMEOUT %us ITFC %s"
-                " %04X%04X%04X 0x%08X ->"
-                " %04X%04X%04X 0x%08X\n",
+                " 0x%04X%04X%04X 0x%08X ->"
+                " 0x%04X%04X%04X 0x%08X\n",
                 pid,
                 CONN_BURST,
                 this->oPkts, oPkts/O_PKTS_UNIT,
