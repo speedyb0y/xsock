@@ -387,7 +387,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->iAddrs[1] = BE32(ADDR_CLT + hid);
     wire-> ports[1] = BE16(cid);
 #endif
-    wire->iTTLProtocol = TTL_TCP;
+    wire->iTTL      = 64;
+    wire->iProtocol = IPPROTO_TCP;
     wire->iSize     = BE16(ipSize);
     wire->iChecksum = 0;
     wire->iChecksum = ip_fast_csum(WIRE_IP(wire), 5);
@@ -526,7 +527,8 @@ uint pid = conn->pid;
     *(u64*)wire->iAddrs       = *(u64*)path->iAddrs;
            wire->iCID         = BE16(cid);
            wire->iSize        = BE16(ipSize);
-           wire->iTTLProtocol = TTL_UDP;
+           wire->iTTL         = 64;
+           wire->iProtocol    = IPPROTO_UDP;
            wire->iChecksum    = 0;
            wire->iChecksum    = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
