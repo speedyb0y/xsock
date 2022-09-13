@@ -100,14 +100,6 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 #ifdef __BIG_ENDIAN
-#define TTL_UDP 0x4011U
-#define TTL_TCP 0x4006U
-#else
-#define TTL_UDP 0x1140U
-#define TTL_TCP 0x0640U
-#endif
-
-#ifdef __BIG_ENDIAN
 #define XSOCK_WIRE_TCP_CWR 0b0000000010000000U
 #define XSOCK_WIRE_TCP_ECE 0b0000000001000000U
 #define XSOCK_WIRE_TCP_URG 0b0000000000100000U
@@ -143,7 +135,8 @@ typedef struct xsock_wire_s {
     u16 iSize;
     u16 iCID; // CONNECTION ID (CLIENT SOURCE (EPHEMERAL) PORT)
     u16 iFrag;
-    u16 iTTLProtocol;
+    u8  iTTL;
+    u8  iProtocol;
     u16 iChecksum;
     u32 iAddrs[2];
     u16 ports[2];
@@ -296,9 +289,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
     if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
 || WIRE_ETH(wire) < SKB_HEAD(skb)
-         || wire->eType    != BE16(ETH_P_IP)
-         //|| wire->iProtocol != IPPROTO_UDP
-         )
+         || wire->eType != BE16(ETH_P_IP)
+         || wire->iProtocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
 
     // NOTE: ASSUMINDO QUE NAS MESMAS PORTAS NAO PODE TER NENHUM SERVICO TCP/SCTP/DCCP ABERTOS NAS INTERFACES HOOKADAS
