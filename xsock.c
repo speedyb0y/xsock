@@ -55,11 +55,8 @@ typedef struct net_device_ops net_device_ops_s;
 
 #define CACHE_LINE_SIZE 64
 
-#define __A6(x) (x)[0], (x)[1], (x)[2], (x)[3], (x)[4], (x)[5]
-#define __A4(x) (x)[0], (x)[1], (x)[2], (x)[3]
-
-#define _MAC(x) __A6(x)
-#define _IP4(x) __A4(x)
+#define _MAC(x) BE16((x)[0]), BE16((x)[1]), BE16((x)[2])
+#define _IP4(x) (x)[0], (x)[1], (x)[2], (x)[3]
 
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_PORT        XCONF_XSOCK_PORT
@@ -366,8 +363,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->cport     = wire->ports[0];
 
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
-            " %02X:%02X:%02X:%02X:%02X:%02X 0x%04X %u ->"
-            " %02X:%02X:%02X:%02X:%02X:%02X 0x%04X %u\n",
+            " %04X%04X%04X 0x%04X %u ->"
+            " %04X%04X%04X 0x%04X %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
             _MAC(path->eSrc), path->iAddrs[0], BE16(wire->ports[1]),
             _MAC(path->eDst), path->iAddrs[1], BE16(path->cport));
@@ -668,8 +665,8 @@ static int __init xsock_init (void) {
             const xsock_cfg_path_s* const peer = &cfg.srv[pid];
 #endif
             printk_host("PATH %u: INITIALIZING WITH OUT BURST %uj MAX %up %us IN TIMEOUT %us ITFC %s"
-                " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u ->"
-                " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u\n",
+                " %04X%04X%04X %u.%u.%u.%u ->"
+                " %04X%04X%04X %u.%u.%u.%u\n",
                 pid,
                 this->oBurst,
                 this->oPkts,
