@@ -159,6 +159,9 @@ typedef struct xsock_wire_s {
     };
 } xsock_wire_s;
 
+#define wire_hash(wire, ipSizeOrig) \
+    ((wire_hash_t*)(WIRE_IP(wire) + (ipSizeOrig)))
+
 typedef u32 wire_hash_t;
 
 // EXPECTED SIZE
@@ -254,8 +257,6 @@ static const xsock_cfg_s cfg = {
 #endif
     }
 };
-
-#define wire_hash(wire, ipSizeReal) ((wire_hash_t*)(PTR(&(wire)->iVersionTOS) + (ipSizeReal)))
 
 static wire_hash_t xsock_out_encrypt (void* data, uint size) {
 
