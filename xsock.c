@@ -306,10 +306,16 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint srvPort = BE16(wire->ports[1]);
 #else
     const uint srvPort = BE16(wire->ports[0]);
+    const uint cltPort = BE16(wire->ports[1]);
 #endif
 
+    // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
+#if XSOCK_SERVER
     if (srvPort < PORT(0, 0)
      || srvPort > PORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1))
+#else
+    if (cltPort != BE16(XSOCK_PORT))
+#endif
         return RX_HANDLER_PASS;
 
     // IDENTIFY HOST, PATH AND CONN
