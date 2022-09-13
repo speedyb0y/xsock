@@ -503,29 +503,26 @@ printk("c %u TENTANDO PATH %u\n", c, pid);
                     ;
                 oRemaining *= path->oPkts;
                 oRemaining += path->oRemaining;
-                // BUT CAP TO THE MAX
                 if (oRemaining > ((u64)path->oPkts*HZ))
                     oRemaining = ((u64)path->oPkts*HZ);
-                elif (oRemaining < O_PKTS_UNIT)
-                    // TODOS OS PATHS ESTÃO EXAUSTOS, RESETA O BURST DESTE
-                    // MAS SÓ PELA METADE PARA COMPENSAR O FATO DE JA TER ULTRAPASSADO
-                    // O QUE IMPORTA É QUE NÃO SE TRANSFORME NUMA LOUCURA DE ENVIAR 1 PACOTE EXCEDENTE EM CADA PATH
-                    oRemaining = ((u64)path->oPkts*HZ)/2;
-                // SALVA
                 path->oRemaining = oRemaining;
                 path->oLast = now;
-            } else
-                // SALVA
-                path->oRemaining -= O_PKTS_UNIT;
+            }
 
-
-        // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
-        // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
+            // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
+            // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
             if ((path->oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
 #if XSOCK_SERVER        
             && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
 #endif
             ) { // ACHOU UM PATH USAVEL
+                if (path->oRemaining >= O_PKTS_UNIT)
+                    path->oRemaining -= O_PKTS_UNIT;
+                else
+                    // TODOS OS PATHS ESTÃO EXAUSTOS, RESETA O BURST DESTE
+                    // MAS SÓ PELA METADE PARA COMPENSAR O FATO DE JA TER ULTRAPASSADO
+                    // O QUE IMPORTA É QUE NÃO SE TRANSFORME NUMA LOUCURA DE ENVIAR 1 PACOTE EXCEDENTE EM CADA PATH
+                    path->oRemaining = ((u64)path->oPkts*HZ)/2;
                 break;
             }
         }
