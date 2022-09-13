@@ -174,14 +174,15 @@ typedef struct xsock_path_s {
     u16 oTime; // MÁXIMO DE TEMPO (EM SEGUNDOS) ATÉ PASSAR PARA OUTRO PATH
 #if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
     u16 cport;
-    u32 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
+    u16 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
+    u16 reserved0;
     u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
-    u16 reserved3;
-    u32 reserved0;
-    u64 reserved1;
+    u16 reserved0;
+    u32 reserved1;
     u64 reserved2;
+    u64 reserved3;
 #endif
     u16 eDst[ETH_ALEN/sizeof(u16)];
     u16 eSrc[ETH_ALEN/sizeof(u16)];
@@ -690,11 +691,13 @@ static int __init xsock_init (void) {
          // path->iHash     --> 0
          // path->iActive   --> 0
             path->iTimeout  = this->iTimeout;
+         // path->reserved0 --> 0
          // path->cport     --> 0
 #else
          // path->reserved0 --> 0
          // path->reserved1 --> 0
          // path->reserved2 --> 0
+         // path->reserved3 --> 0
 #endif
             path->eDst[0]     = this->eSrc[0];
             path->eDst[1]     = this->eSrc[1];
