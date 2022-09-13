@@ -479,12 +479,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
     uint c = XSOCK_PATHS_N;
-        
+
     xsock_path_s* path;
 
     // CHOOSE PATH
-    loop {
-        path = &host->paths[pid];
+    loop { path = &host->paths[pid];
 
         if (path->oPkts
 #if XSOCK_SERVER
@@ -494,7 +493,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
          && path->itfc->flags & IFF_UP
         ) { // ACHOU UM PATH USAVEL
 
-            // 
+            //
             if (path->oRemaining < (1U << 8)) {
                 // GET THE ELAPSED JIFFES
                 u64 pkts = (now > path->oLast)
@@ -520,17 +519,19 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         }
 
         // PATH INUSABLE
-        
-        if (!c--)
+
+        if (!--c)
             // NENHUM PATH DISPONÍVEL
             goto drop;
-            
+
         // GO TO NEXT PATH
-        path = &host->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
+        path = &host->paths[(
+			pid = (pid + 1) % XSOCK_PATHS_N
+		)];
     }
 
-	//
-	conn->pid = pid;
+    //
+    conn->pid = pid;
     conn->burst = now + path->oBurst;
 
     // TODO: CONFIRM WE HAVE THIS FREE SPACE
