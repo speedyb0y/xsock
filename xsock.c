@@ -501,7 +501,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
 #endif
         ) { // ACHOU UM PATH USAVEL
-            
+
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
             if (path->oRemaining < O_PKTS_UNIT) {
                 u64 oRemaining = now >= path->oLast
