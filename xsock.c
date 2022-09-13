@@ -675,11 +675,13 @@ static int __init xsock_init (void) {
         printk_host("INITIALIZING\n");
 
         // INITIALIZE CONNECTIONS
-        // conn[*].pid
-        // conn[*].burst
-        // conn[*].limit     ---> 0
-        // conn[*].pkts
-        // conn[*].cdown
+        for (cid, XSOCK_CONNS_N) {
+			xsock_path_s* const
+			conn = &host->conns[cid];
+			conn->pid	= pid;
+			conn->burst = 0;
+			conn->cdown = 0;
+		}
 
         // INITIALIZE PATHS
         foreach (pid, XSOCK_PATHS_N) {
