@@ -173,6 +173,15 @@ typedef u32 wire_hash_t;
 // EXPECTED SIZE
 #define XSOCK_PATH_SIZE CACHE_LINE_SIZE
 
+
+opkts = ((50*1000*1000) << 8)/1500
+mas se isso é por segundo, entao converte esse optks para jiffies
+opkts = ((50*1000*1000) << 8)/(1500*HZ) ?
+
+na verdade ao inves de oPkts vai ter que guardar o oMax
+pois este sera o maximo que pode armazenar no oRemaining
+vai capear a isso
+
 const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
 SE oLast > now
     entao passou o tempo
@@ -180,6 +189,7 @@ SE oLast > now
     
 oRemaining += (elapsedJiffies * oPkts) //  este oPkts calcualdo com << 4
 mas ao ler o oRemaining, usar um (oRemaining >> 4)
+ou a cada pacote que enviar, abater oRemaining -= (1 << 4)
 assim aguenta um numero fracionario e mais preciso
 
 // o oBurst é relativo a conexao enao tem q ue er uma macro global pois é especifico da atividade do servico
@@ -195,9 +205,9 @@ typedef struct xsock_path_s {
     u64 iActive; //  [IN LAST]  ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
-    u32 reserved1;
+    u32 reserved0;
+    u64 reserved1;
     u64 reserved2;
-    u64 reserved3;
 #endif
     u16 eDst[ETH_ALEN/sizeof(u16)];
     u16 eSrc[ETH_ALEN/sizeof(u16)];
@@ -207,14 +217,14 @@ typedef struct xsock_path_s {
 } xsock_path_s;
 
 // EXPECTED SIZE
-#define XSOCK_CONN_SIZE 24
+#define XSOCK_CONN_SIZE 16
 
 typedef struct xsock_conn_s {
-    u32 pkts;
-    u16 cdown;
-    u16 pid;
     u64 burst; //
-    u64 limit;
+    u32 reserved0;
+    u16 reserved1;
+    u8 cdown;
+    u8 pid;
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
