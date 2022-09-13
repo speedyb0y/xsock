@@ -469,16 +469,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     uint cdown = (wire->tFlags & XSOCK_WIRE_TCP_SYN)
         ? XSOCK_PATHS_N
         : conn->cdown;
-
     // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
     uint pid = conn->pid + (cdown || conn->burst < now);
-
     // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
     uint c = XSOCK_PATHS_N;
 
+    // CHOOSE PATH
     xsock_path_s* path;
 
-    // CHOOSE PATH
     loop { path = &host->paths[(pid %= XSOCK_PATHS_N)];
 
         if (path->oPkts
@@ -672,8 +670,8 @@ static int __init xsock_init (void) {
         foreach (cid, XSOCK_CONNS_N) {
             xsock_conn_s* const conn = &host->conns[cid];
             conn->pid   = cid % XSOCK_PATHS_N;
-            conn->burst = 0;
             conn->cdown = 0;
+            conn->burst = 0;
         }
 
         // INITIALIZE PATHS
