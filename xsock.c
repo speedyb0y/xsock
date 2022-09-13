@@ -191,8 +191,7 @@ typedef struct xsock_path_s {
     u8  eSrc[ETH_ALEN];
     u16 eType;
     u16 iVersionTOS;
-    union { u8 saddr[4]; u32 saddr32; };
-    union { u8 daddr[4]; u32 daddr32; };
+    u32 iAddrs[2];
 } xsock_path_s;
 
 // EXPECTED SIZE
@@ -220,7 +219,7 @@ typedef struct xsock_cfg_path_s {
     uint port;
     u8   mac[ETH_ALEN];
     u8   gw[ETH_ALEN];
-    u8   addr[4];
+    union { u8 addr[4]; u32 addr32; };
 } xsock_cfg_path_s;
 
 typedef struct xsock_cfg_s {
@@ -356,20 +355,19 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-          memcpy(path->eDst,      wire->eSrc, ETH_ALEN);
-          memcpy(path->eSrc,      wire->eDst, ETH_ALEN);
-                 path->eType    = wire->eType;
-                 path->iVersionTOS = BE16(0x4500U);
-                 path->saddr32  = wire->iAddrs[0];
-                 path->daddr32  = wire->iAddrs[1];
-                 path->cport    = wire->ports[0];
+          memcpy(path->eDst,       wire->eSrc, ETH_ALEN);
+          memcpy(path->eSrc,       wire->eDst, ETH_ALEN);
+                 path->eType     = wire->eType;
+                 path->iAddrs[1] = wire->iAddrs[0];
+                 path->iAddrs[0] = wire->iAddrs[1];
+                 path->cport     = wire->ports[0];
 
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
-            " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
-            " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
+            " %02X:%02X:%02X:%02X:%02X:%02X 0x%04X %u ->"
+            " %02X:%02X:%02X:%02X:%02X:%02X 0x%04X %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->eSrc), _IP4(path->saddr), BE16(wire->ports[1]),
-            _MAC(path->eDst), _IP4(path->daddr), BE16(path->cport));
+            _MAC(path->eSrc), path->iAddrs[0], BE16(wire->ports[1]),
+            _MAC(path->eDst), path->iAddrs[1], BE16(path->cport));
     }
 #endif
 
@@ -522,8 +520,8 @@ uint pid = conn->pid;
            wire->ports[0]         = BE16(XSOCK_PORT);
            wire->ports[1]         = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
-           wire->iAddrs[0]    = path->saddr32;
-           wire->iAddrs[1]    = path->daddr32;
+           wire->iAddrs[0]    = path->iAddrs[0];
+           wire->iAddrs[1]    = path->iAddrs[1];
            wire->iCID         = BE16(cid);
            wire->iSize        = BE16(ipSize);
            wire->iTTLProtocol = TTL_UDP;
@@ -697,8 +695,8 @@ static int __init xsock_init (void) {
      memcpy(path->eSrc,    this->mac, ETH_ALEN);
             path->eType       = BE16(ETH_P_IP);
             path->iVersionTOS = BE16(0x4500U);
-     memcpy(path->saddr,   this->addr, 4);
-     memcpy(path->daddr,   peer->addr, 4);
+     path->iAddrs[0] =   this->addr32;
+     path->iAddrs[1] =   peer->addr32;
 
             net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
