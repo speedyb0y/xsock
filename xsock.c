@@ -119,9 +119,10 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_WIRE_TCP_FIN 0b0000000100000000U
 #endif
 
-#define WIRE_ETH(wire) PTR(&(wire)->eDst)
-#define WIRE_IP(wire) PTR(&(wire)->iVersionTOS)
-#define WIRE_UDP(wire) PTR(&(wire)->ports)
+#define WIRE_ETH(wire)         PTR(&(wire)->eDst)
+#define WIRE_IP(wire)          PTR(&(wire)->iVersionTOS)
+#define WIRE_UDP(wire)         PTR(&(wire)->ports)
+#define WIRE_UDP_PAYLOAD(wire) PTR(&(wire)->uPayload)
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE 56
@@ -157,6 +158,8 @@ typedef struct xsock_wire_s {
             u16 uPayload[6]; // AS FAKE UDP
     };
 } xsock_wire_s;
+
+typedef u32 wire_hash_t;
 
 // EXPECTED SIZE
 #define XSOCK_PATH_SIZE CACHE_LINE_SIZE
@@ -252,8 +255,6 @@ static const xsock_cfg_s cfg = {
     }
 };
 
-typedef u32 wire_hash_t;
-
 #define wire_hash(wire, ipSizeReal) ((wire_hash_t*)(PTR(&(wire)->iVersionTOS) + (ipSizeReal)))
 
 static wire_hash_t xsock_out_encrypt (void* data, uint size) {
@@ -327,7 +328,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (pid >= XSOCK_PATHS_N)
         goto drop;
 
-    // THE PACKET IS THE SAME EXCEPT THE HASH
+    // GET THE SIZE OF THE ORIGINAL PACKET
     const uint ipSize = BE16(wire->iSize) - sizeof(wire_hash_t);
 
     // DROP INCOMPLETE PACKETS
@@ -335,7 +336,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(PTR(&wire->uPayload), ipSize - 28)
+    if (xsock_in_decrypt(WIRE_UDP_PAYLOAD(wire), ipSize - 28)
         != BE32(*wire_hash(wire, ipSize)))
         goto drop;
 
@@ -535,7 +536,7 @@ uint pid = conn->pid;
 
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
-        = BE32(xsock_out_encrypt(PTR(&wire->uPayload), ipSize - 32));
+        = BE32(xsock_out_encrypt(WIRE_UDP_PAYLOAD(wire), ipSize - 32));
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
