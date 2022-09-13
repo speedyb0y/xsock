@@ -473,7 +473,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         ? XSOCK_PATHS_N
         : conn->cdown;
     // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
-    uint pid = conn->pid + (cdown || conn->burst < now);
+    uint pid = (uint)conn->pid + (cdown || conn->burst < now);
 
 #if XSOCK_SERVER
 #define TRY_OK                   (3*XSOCK_PATHS_N)
@@ -501,34 +501,38 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
 #endif
         ) { // ACHOU UM PATH USAVEL
+            u64 oRemaining = path->oRemaining;
 
-            //
-            if (path->oRemaining < O_PKTS_UNIT) {
-                // ESSE PATH JÁ ESTOUROU O LIMITE
-                // GET THE ELAPSED JIFFES
-                u64 pkts = now >= path->oLast
-                        ?   now - path->oLast
-                        : O_PKTS_UNIT // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
+            oRemaining -= O_PKTS_UNIT;
+            
+            // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
+            if (oRemaining >= 0xFFFFFFFFULL) {
+                oRemaining = now >= path->oLast
+                        ? now - path->oLast
+                        : path->oLast - now // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
                     ;
-                // HOW MANY PACKETS RECOVERED
-                pkts *= path->oPkts;
-                //
-                pkts += path->oRemaining;
+                oRemaining *= path->oPkts;
+                oRemaining += path->oRemaining;
                 // BUT CAP TO THE MAX
-                if (pkts > ((u64)path->oPkts*HZ))
-                    pkts = ((u64)path->oPkts*HZ);
-                // SALVA
-                path->oRemaining = pkts;
+                if (oRemaining > ((u64)path->oPkts*HZ))
+                    oRemaining = ((u64)path->oPkts*HZ);
+                elif (oRemaining < O_PKTS_UNIT)
+                    // TODOS OS PATHS ESTÃO EXAUSTOS, RESETA O BURST DESTE
+                    // MAS SÓ PELA METADE PARA COMPENSAR O FATO DE JA TER ULTRAPASSADO
+                    // O QUE IMPORTA É QUE NÃO SE TRANSFORME NUMA LOUCURA DE ENVIAR 1 PACOTE EXCEDENTE EM CADA PATH
+                    oRemaining = ((u64)path->oPkts*HZ)/2;
+                // SALVA                
                 path->oLast = now;
             }
 
-            if (path->oRemaining >= O_PKTS_UNIT)
-                path->oRemaining -= O_PKTS_UNIT;
             else { // JA ESTOUROU O LIMITE; ESTÁ USANDO ESTE PATH POIS NÃO TEM OUTROS
-                //
-                path->oRemaining = ((u64)(path->oPkts*HZ))/2;
+                //                
                 path->oLast = now - HZ/2;
+                oRemaining = ((u64)(path->oPkts*HZ))/2;
             }
+
+            // SALVA
+            path->oRemaining = oRemaining;
 
             break;
         }
