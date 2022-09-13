@@ -297,17 +297,22 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
 || WIRE_ETH(wire) < SKB_HEAD(skb)
          || wire->eType    != BE16(ETH_P_IP)
-         //|| wire->iVersion  != 0x45
          //|| wire->iProtocol != IPPROTO_UDP
          )
         return RX_HANDLER_PASS;
 
-    // IDENTIFY HOST, PATH AND CONN
+    // NOTE: ASSUMINDO QUE NAS MESMAS PORTAS NAO PODE TER NENHUM SERVICO TCP/SCTP/DCCP ABERTOS NAS INTERFACES HOOKADAS
 #if XSOCK_SERVER
     const uint srvPort = BE16(wire->ports[1]);
 #else
     const uint srvPort = BE16(wire->ports[0]);
 #endif
+
+    if (srvPort < PORT(0, 0)
+     || srvPort > PORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1))
+        return RX_HANDLER_PASS;
+
+    // IDENTIFY HOST, PATH AND CONN
     const uint hid = PORT_HID(srvPort);
     const uint pid = PORT_PID(srvPort);
     const uint cid = BE16(wire->iCID);
@@ -318,11 +323,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #else
     if (hid != XSOCK_HOST_ID)
 #endif
-        return RX_HANDLER_PASS;
+        goto drop;
 
     // VALIDATE PATH ID
     if (pid >= XSOCK_PATHS_N)
-        return RX_HANDLER_PASS;
+        goto drop;
 
     // THE PACKET IS THE SAME EXCEPT THE HASH
     const uint ipSize = BE16(wire->iSize) - sizeof(wire_hash_t);
