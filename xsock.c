@@ -701,12 +701,12 @@ static int __init xsock_init (void) {
          // path->reserved2 --> 0
          // path->reserved3 --> 0
 #endif
-            path->eDst[0]     = this->eSrc[0];
-            path->eDst[1]     = this->eSrc[1];
-            path->eDst[2]     = this->eSrc[2];
-            path->eSrc[0]     = this->eDst[0];
-            path->eSrc[1]     = this->eDst[1];
-            path->eSrc[2]     = this->eDst[2];
+            path->eDst[0]     = this->eDst[0];
+            path->eDst[1]     = this->eDst[1];
+            path->eDst[2]     = this->eDst[2];
+            path->eSrc[0]     = this->eSrc[0];
+            path->eSrc[1]     = this->eSrc[1];
+            path->eSrc[2]     = this->eSrc[2];
             path->eType       = BE16(ETH_P_IP);
             path->iVersionTOS = BE16(0x4500U);
             path->iAddrs[0]   = this->addr32;
