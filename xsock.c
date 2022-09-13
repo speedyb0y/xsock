@@ -423,14 +423,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
        - sizeof(*wire);
 
     if (WIRE_ETH(wire) < PTR(skb->head)
-          //|| wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
-          || wire->iAddrs[0]   != BE32(ADDR_SRV)
-          || wire->ports [0]   != BE16(XSOCK_PORT)
+          || wire->iAddrs[0] != BE32(ADDR_SRV)
+          || wire-> ports[0] != BE16(XSOCK_PORT)
 #else
-          //|| wire->ip.src32   != BE32(ADDR_CLT + XSOCK_HOST_ID)
-          || wire->iAddrs[1]   != BE32(ADDR_SRV)
-          || wire->ports [1]   != BE16(XSOCK_PORT)
+          || wire->iAddrs[0] != BE32(ADDR_CLT + XSOCK_HOST_ID)
+          || wire->iAddrs[1] != BE32(ADDR_SRV)
+          || wire-> ports[1] != BE16(XSOCK_PORT)
 #endif
     )
         goto drop;
@@ -452,7 +451,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_conn_s* const conn = &host->conns[cid];
 
-    //
+    // TODO: FIXME: NO CLIENTE, SALVAR O ACK&SEQ DO SYN COMO BASE DO KEY
     if (wire->tFlags & XSOCK_WIRE_TCP_SYN)
         conn->cdown = 3*XSOCK_PATHS_N;
 
