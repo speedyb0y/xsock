@@ -677,8 +677,8 @@ static int __init xsock_init (void) {
                 this->oTime,
                 this->iTimeout,
                 this->itfc,
-                _MAC(this->mac), _IP4(this->addr32),
-                _MAC(this->gw),  _IP4(peer->addr32)
+                _MAC(this->eSrc), _IP4(this->addr32),
+                _MAC(this->eDst), _IP4(peer->addr32)
             );
 
          // path->itfc      --> NULL
