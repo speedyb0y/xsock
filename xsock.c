@@ -355,9 +355,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-          memcpy(path->eDst,       wire->eSrc, ETH_ALEN);
-          memcpy(path->eSrc,       wire->eDst, ETH_ALEN);
-                 path->eType     = wire->eType;
+                 path->eDst[0]   = wire->eSrc[0];
+                 path->eDst[1]   = wire->eSrc[1];
+                 path->eDst[2]   = wire->eSrc[2];
+                 path->eSrc[0]   = wire->eDst[0];
+                 path->eSrc[1]   = wire->eDst[1];
+                 path->eSrc[2]   = wire->eDst[2];
                  path->iAddrs[1] = wire->iAddrs[0];
                  path->iAddrs[0] = wire->iAddrs[1];
                  path->cport     = wire->ports[0];
