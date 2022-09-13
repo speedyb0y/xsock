@@ -413,8 +413,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->csum_valid      = 1;
     skb->dev             = xdev;
 
-    *pskb = skb;
-
     return RX_HANDLER_ANOTHER;
 
 drop:
