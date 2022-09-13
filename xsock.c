@@ -131,7 +131,7 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 #define WIRE_ETH(wire) PTR(&(wire)->eDst)
-#define WIRE_IP(wire) PTR(&(wire)->iVersion)
+#define WIRE_IP(wire) PTR(&(wire)->iVersionTOS)
 #define WIRE_UDP(wire) PTR(&(wire)->uSrc)
 
 // EXPECTED SIZE
@@ -269,7 +269,7 @@ static const xsock_cfg_s cfg = {
 
 typedef u32 wire_hash_t;
 
-#define wire_hash(wire, ipSizeReal) ((wire_hash_t*)(PTR(&(wire)->iVersion) + (ipSizeReal)))
+#define wire_hash(wire, ipSizeReal) ((wire_hash_t*)(PTR(&(wire)->iVersionTOS) + (ipSizeReal)))
 
 static wire_hash_t xsock_out_encrypt (void* data, uint size) {
 
@@ -298,14 +298,14 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (skb_linearize(skb))
         goto drop;
 
-    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
+    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
     if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
 || WIRE_ETH(wire) < SKB_HEAD(skb)
          || wire->eType    != BE16(ETH_P_IP)
-         || wire->iVersion  != 0x45
+         //|| wire->iVersion  != 0x45
          //|| wire->iProtocol != IPPROTO_UDP
          )
         return RX_HANDLER_PASS;
