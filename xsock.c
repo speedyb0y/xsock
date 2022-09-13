@@ -514,23 +514,23 @@ uint pid = conn->pid;
 
     // RE-ENCAPSULATE
     // SALVA ANTES DE SOBRESCREVER
-           wire->tSeq2        = wire->tSeq;
-           wire->uSize        = BE16(ipSize - 20);
-           wire->uChecksum    = 0;
+           wire->tSeq2       = wire->tSeq;
+           wire->uSize       = BE16(ipSize - 20);
+           wire->uChecksum   = 0;
 #if XSOCK_SERVER
-           wire->ports[0]         = BE16(PORT(hid, pid));
-           wire->ports[1]         = path->cport; // THE CLIENT IS BEHIND NAT
+           wire->ports[0]    = BE16(PORT(hid, pid));
+           wire->ports[1]    = path->cport; // THE CLIENT IS BEHIND NAT
 #else
-           wire->ports[0]         = BE16(XSOCK_PORT);
-           wire->ports[1]         = BE16(PORT(XSOCK_HOST_ID, pid));
+           wire->ports[0]    = BE16(XSOCK_PORT);
+           wire->ports[1]    = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
-    *(u64*)wire->iAddrs       = *(u64*)path->iAddrs;
-           wire->iCID         = BE16(cid);
-           wire->iSize        = BE16(ipSize);
-           wire->iTTL         = 64;
-           wire->iProtocol    = IPPROTO_UDP;
-           wire->iChecksum    = 0;
-           wire->iChecksum    = ip_fast_csum(WIRE_IP(wire), 5);
+    *(u64*)wire->iAddrs      = *(u64*)path->iAddrs;
+           wire->iCID        = BE16(cid);
+           wire->iSize       = BE16(ipSize);
+           wire->iTTL        = 64;
+           wire->iProtocol   = IPPROTO_UDP;
+           wire->iChecksum   = 0;
+           wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
