@@ -79,8 +79,8 @@ typedef struct net_device_ops net_device_ops_s;
 
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE HOST AND PATH
 #define PORT(hid, pid) (XSOCK_PORT + (hid)*10 + (pid))
-#define PORT_HID(port) (((port) - XSOCK_PORT) / 10)
-#define PORT_PID(port) (((port) - XSOCK_PORT) % 10)
+#define PORT_HID(port) (((uint)(port) - XSOCK_PORT) / 10)
+#define PORT_PID(port) (((uint)(port) - XSOCK_PORT) % 10)
 
 // O ULTIMO HOST E ULTIMO PATH TEM QUE DAR UMA PORTA VALIDA
 #if PORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
