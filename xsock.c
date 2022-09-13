@@ -440,7 +440,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
 
 #if XSOCK_SERVER
-    const uint hid = (BE32(wire->iAddrs[1]) & 0xFFU) - 1;
+    const uint hid = BE32(wire->iAddrs[1]) - ADDR_CLT;
 
     if (hid >= XSOCK_HOSTS_N)
         goto drop;
