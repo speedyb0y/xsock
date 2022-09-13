@@ -359,6 +359,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
           memcpy(path->eDst,      wire->eSrc, ETH_ALEN);
           memcpy(path->eSrc,      wire->eDst, ETH_ALEN);
                  path->eType    = wire->eType;
+                 path->iVersionTOS = 0x0045U;
                  path->saddr32  = wire->iAddrs[0];
                  path->daddr32  = wire->iAddrs[1];
                  path->cport    = wire->ports[0];
