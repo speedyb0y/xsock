@@ -313,14 +313,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint cid = BE16(wire->iCID);
 
     // VALIDATE HOST ID
-    // VALIDATE PATH ID
-    if (
 #if XSOCK_SERVER
-        hid >= XSOCK_HOSTS_N
+    if (hid >= XSOCK_HOSTS_N)
 #else
-        hid != XSOCK_HOST_ID
+    if (hid != XSOCK_HOST_ID)
 #endif
-     || pid >= XSOCK_PATHS_N)
+        return RX_HANDLER_PASS;
+
+    // VALIDATE PATH ID
+    if (pid >= XSOCK_PATHS_N)
         return RX_HANDLER_PASS;
 
     // THE PACKET IS THE SAME EXCEPT THE HASH
@@ -694,7 +695,7 @@ static int __init xsock_init (void) {
             path->eDst[2]     = this->eSrc[2];
             path->eSrc[0]     = this->eDst[0];
             path->eSrc[1]     = this->eDst[1];
-            path->eSrc[2]     = this->eDst[2];     
+            path->eSrc[2]     = this->eDst[2];
             path->eType       = BE16(ETH_P_IP);
             path->iVersionTOS = BE16(0x4500U);
             path->iAddrs[0]   = this->addr32;
