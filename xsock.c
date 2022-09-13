@@ -541,7 +541,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     //
     if (conn->pid != pid)
-        printk("CONN %u conn->pid %u -> pid %u | conn->cdown %u -> cdown %u | path->oRemaining %u\n", cid, conn->pid, pid, conn->cdown, cdown, path->oRemaining );
+        printk("CONN %u conn->pid %u -> pid %u | conn->cdown %u -> cdown %u"
+        " | path->oRemaining %u\n", cid, conn->pid, pid, conn->cdown, cdown, path->oRemaining/O_PKTS_UNIT );
     conn->pid = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
