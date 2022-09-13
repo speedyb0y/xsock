@@ -77,6 +77,12 @@ typedef struct net_device_ops net_device_ops_s;
 #error "BAD XSOCK_PATHS_N"
 #endif
 
+#if XSOCK_SERVER
+#if ! (0 <= XSOCK_HOST_ID && XSOCK_HOST_ID < 0xFF)
+#error "BAD XSOCK_HOST_ID"
+#endif
+#endif
+
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE HOST AND PATH
 #define PORT(hid, pid) (XSOCK_PORT + (hid)*10 + (pid))
 #define PORT_HID(port) (((uint)(port) - XSOCK_PORT) / 10)
@@ -90,8 +96,8 @@ typedef struct net_device_ops net_device_ops_s;
 // 0xFFFF + 1
 #define XSOCK_CONNS_N 65536
 
-#define ADDR_SRV 0xC0000000U // 192.0.0.0
-#define ADDR_CLT 0xC0000001U // 192.0.0.1
+#define ADDR_SRV 0xC00000FFU // 192.0.0.255
+#define ADDR_CLT 0xC0000000U // 192.0.0.0
 
 #if XSOCK_SERVER
 #define printk_host(msg, ...) printk("XSOCK: HOST: %u " msg, hid, ##__VA_ARGS__)
@@ -379,13 +385,13 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // RE-ENCAPSULATE
 #if XSOCK_SERVER
-    wire->iAddrs[0] = BE32(ADDR_CLT + hid);
+    wire->iAddrs[0] = BE32(ADDR_CLT | hid);
     wire->iAddrs[1] = BE32(ADDR_SRV);
     wire-> ports[0] = BE16(cid);
     wire-> ports[1] = BE16(XSOCK_PORT);
 #else
     wire->iAddrs[0] = BE32(ADDR_SRV);
-    wire->iAddrs[1] = BE32(ADDR_CLT + hid);
+    wire->iAddrs[1] = BE32(ADDR_CLT | XSOCK_HOST_ID);
     wire-> ports[0] = BE16(XSOCK_PORT);
     wire-> ports[1] = BE16(cid);
 #endif
@@ -432,7 +438,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
           || wire->iAddrs[0] != BE32(ADDR_SRV)
           || wire-> ports[0] != BE16(XSOCK_PORT)
 #else
-          || wire->iAddrs[0] != BE32(ADDR_CLT + XSOCK_HOST_ID)
+          || wire->iAddrs[0] != BE32(ADDR_CLT | XSOCK_HOST_ID)
           || wire->iAddrs[1] != BE32(ADDR_SRV)
           || wire-> ports[1] != BE16(XSOCK_PORT)
 #endif
@@ -440,7 +446,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
 
 #if XSOCK_SERVER
-    const uint hid = BE32(wire->iAddrs[1]) - ADDR_CLT;
+    const uint hid = BE32(wire->iAddrs[1]) & 0xFF;
 
     if (hid >= XSOCK_HOSTS_N)
         goto drop;
