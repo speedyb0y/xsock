@@ -288,7 +288,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
     if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
-|| WIRE_ETH(wire) < SKB_HEAD(skb)
+|| WIRE_ETH(wire)                 < SKB_HEAD(skb)
          || wire->eType != BE16(ETH_P_IP)
          || wire->iProtocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
@@ -341,12 +341,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
 #if XSOCK_SERVER
-    // NOTE: O SERVER NÃO PODE RECEBER ALEATORIAMENTE COM  UM MESMO IP EM MAIS DE UMA INTERACE, SENÃO VAI FICAR TROCANDO TODA HORA AQUI
     const u64 hash = (u64)(uintptr_t)skb->dev
       + *(u64*)wire->eDst // VAI PEGAR UM PEDAÇO DO eSrc
       + *(u64*)wire->eSrc // VAI PEGAR O eType
       + *(u64*)wire->iAddrs // VAI PEGAR O iDst
-      + *(u32*)wire->ports
+      + *(u32*)wire->ports // VAI PEGAR AMBAS AS PORTAS MAS O SERVER PORT É FIXO PARA ESTE HOST:PATH
     ;
 
     xsock_host_s* const host = &hosts[hid];
