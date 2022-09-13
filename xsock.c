@@ -495,8 +495,10 @@ printk("c %u TENTANDO PATH %u\n", c, pid);
         if (path->oPkts && path->itfc && path->itfc->flags & IFF_UP) {
             // ACHOU UM PATH EXISTENTE E OK
 
+            u64 oRemaining = path->oRemaining;
+            
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
-            if (path->oRemaining < O_PKTS_UNIT) {
+            if (oRemaining < O_PKTS_UNIT) {
                 u64 oRemaining = now >= path->oLast
                         ? now - path->oLast
                         : path->oLast - now // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
@@ -511,18 +513,19 @@ printk("c %u TENTANDO PATH %u\n", c, pid);
 
             // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
             // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
-            if ((path->oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
+            if ((oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
 #if XSOCK_SERVER        
             && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
 #endif
             ) { // ACHOU UM PATH USAVEL
-                if (path->oRemaining >= O_PKTS_UNIT)
-                    path->oRemaining -= O_PKTS_UNIT;
+                if (oRemaining >= O_PKTS_UNIT)
+                    oRemaining -= O_PKTS_UNIT;
                 else
                     // TODOS OS PATHS ESTÃO EXAUSTOS, RESETA O BURST DESTE
                     // MAS SÓ PELA METADE PARA COMPENSAR O FATO DE JA TER ULTRAPASSADO
                     // O QUE IMPORTA É QUE NÃO SE TRANSFORME NUMA LOUCURA DE ENVIAR 1 PACOTE EXCEDENTE EM CADA PATH
-                    path->oRemaining = ((u64)path->oPkts*HZ)/2;
+                    oRemaining = ((u64)path->oPkts*HZ)/2;
+                path->oRemaining = oRemaining;
                 break;
             }
         }
