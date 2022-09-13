@@ -469,6 +469,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // TODO: FIXME: NO CLIENTE, SALVAR O ACK&SEQ DO SYN COMO BASE DO KEY
     // FORCE PATH CHANGING
+    // NOTE: ENQUANTO RETRANSMITIR O SYN/SYN-ACK, VAI FICAR RESETANDO O CDOWN A TODOS OS PATHS
     uint cdown = (wire->tFlags & XSOCK_WIRE_TCP_SYN)
         ? XSOCK_PATHS_N
         : conn->cdown;
@@ -538,6 +539,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
     //
+printk("CONN %u conn->pid %u = pid %u | conn->cdown %u, cdown %u\n", cid, conn->pid, pid, conn->cdown, cdown);
     conn->pid = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
