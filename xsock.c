@@ -56,7 +56,7 @@ typedef struct net_device_ops net_device_ops_s;
 #define CACHE_LINE_SIZE 64
 
 #define _MAC(x) BE16((x)[0]), BE16((x)[1]), BE16((x)[2])
-#define _IP4(x) (x)[0], (x)[1], (x)[2], (x)[3]
+#define _IP4(x) BE32(x)
 
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_PORT        XCONF_XSOCK_PORT
@@ -673,8 +673,8 @@ static int __init xsock_init (void) {
                 this->oTime,
                 this->iTimeout,
                 this->itfc,
-                _MAC(this->mac), _IP4(this->addr),
-                _MAC(this->gw),  _IP4(peer->addr)
+                _MAC(this->mac), _IP4(this->addr32),
+                _MAC(this->gw),  _IP4(peer->addr32)
             );
 
          // path->itfc      --> 0
