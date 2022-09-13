@@ -293,7 +293,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
          || wire->iProtocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
 
-    // NOTE: ASSUMINDO QUE NAS MESMAS PORTAS NAO PODE TER NENHUM SERVICO TCP/SCTP/DCCP ABERTOS NAS INTERFACES HOOKADAS
 #if XSOCK_SERVER
     const uint srvPort = BE16(wire->ports[1]);
 #else
