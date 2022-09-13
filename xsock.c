@@ -460,31 +460,31 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_conn_s* const conn = &host->conns[cid];
 
-	const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
+    const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
 
-	uint pid = conn->pid;
+    uint pid = conn->pid;
 
     // TODO: FIXME: NO CLIENTE, SALVAR O ACK&SEQ DO SYN COMO BASE DO KEY
     // FORCE PATH CHANGING
     if (wire->tFlags & XSOCK_WIRE_TCP_SYN)
         conn->cdown = XSOCK_PATHS_N;
 
-	if (conn->cdown
+    if (conn->cdown
      || conn->burst < now
      || conn->limit < now)
-		pid = (pid + 1) % XSOCK_PATHS_N;
+        pid = (pid + 1) % XSOCK_PATHS_N;
 
-	if (conn->cdown)
-		conn->cdown--;
+    if (conn->cdown)
+        conn->cdown--;
 
-	// TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
-	uint c = XSOCK_PATHS_N;
+    // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
+    uint c = XSOCK_PATHS_N;
         
     xsock_path_s* path;
 
-	// CHOOSE PATH
+    // CHOOSE PATH
     loop {
-		path = &host->paths[pid];
+        path = &host->paths[pid];
 
         if (path->oPkts
 #if XSOCK_SERVER
@@ -494,40 +494,40 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
          && path->itfc->flags & IFF_UP
         ) { // ACHOU UM PATH USAVEL
 
-			// 
-			if (path->oRemaining < (1U << 8)) {
-				// GET THE ELAPSED JIFFES
-				u64 pkts = (now > path->oLast)
-						?   now - path->oLast
-						: 0	// OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
-					;
-				// HOW MANY PACKETS RECOVERED
-				pkts *= path->oPkts;
-				//
-				pkts += path->oRemaining;
-				// BUT CAP TO THE MAX
-				if (pkts > path->oPkts)
-					pkts = path->oPkts;
-				// SALVA
-				path->oRemaining = pkts;
-				path->oLast = now;
-			}
+            // 
+            if (path->oRemaining < (1U << 8)) {
+                // GET THE ELAPSED JIFFES
+                u64 pkts = (now > path->oLast)
+                        ?   now - path->oLast
+                        : 0 // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
+                    ;
+                // HOW MANY PACKETS RECOVERED
+                pkts *= path->oPkts;
+                //
+                pkts += path->oRemaining;
+                // BUT CAP TO THE MAX
+                if (pkts > path->oPkts)
+                    pkts = path->oPkts;
+                // SALVA
+                path->oRemaining = pkts;
+                path->oLast = now;
+            }
 
-			if (path->oRemaining >= (1U << 8)) {
-				path->oRemaining -= 1U << 8;
-				break;
-			}
-		}
+            if (path->oRemaining >= (1U << 8)) {
+                path->oRemaining -= 1U << 8;
+                break;
+            }
+        }
 
-		// PATH INUSABLE
-		
-		if (!c--)
-			// NENHUM PATH DISPONÍVEL
-			goto drop;
-			
-		// GO TO NEXT PATH
-		path = &host->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
-	}
+        // PATH INUSABLE
+        
+        if (!c--)
+            // NENHUM PATH DISPONÍVEL
+            goto drop;
+            
+        // GO TO NEXT PATH
+        path = &host->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
+    }
 
     
     if (
@@ -721,15 +721,15 @@ static int __init xsock_init (void) {
                 _MAC(this->eDst), _IP4(peer->addr32)
             );
 
-			//oPkts = this->oPkts ????;
-			// PEGA A LARGURA DE BANDA POSSÍVEL EM UM SEGUNDO
-			// TRANSFORMA NO NÚMERO DE PACOTES
-			// MAS FAZ ISSO COM 8 BITS A MAIS DE PRECISAO:
-			//		ISSO/(2^8) = NUMERO REAL
-			// ESTE VALOR É A QUANTIDADE DE PACOTES POR SEGUNDO.
-			// DIVIDE ELE PELA QUANTIDADE DE JIFFIES EM UM SEGUNDO.
-			// ESTE VALOR É A QUANTIDADE DE PACOTES QUE PODE PASSAR DURANTE UM JIFFIE.
-			const uint oPkts = (((uint)(50*1000*1000)) << 8)/(1500*HZ);
+            //oPkts = this->oPkts ????;
+            // PEGA A LARGURA DE BANDA POSSÍVEL EM UM SEGUNDO
+            // TRANSFORMA NO NÚMERO DE PACOTES
+            // MAS FAZ ISSO COM 8 BITS A MAIS DE PRECISAO:
+            //      ISSO/(2^8) = NUMERO REAL
+            // ESTE VALOR É A QUANTIDADE DE PACOTES POR SEGUNDO.
+            // DIVIDE ELE PELA QUANTIDADE DE JIFFIES EM UM SEGUNDO.
+            // ESTE VALOR É A QUANTIDADE DE PACOTES QUE PODE PASSAR DURANTE UM JIFFIE.
+            const uint oPkts = (((uint)(50*1000*1000)) << 8)/(1500*HZ);
 
          // path->itfc       --> NULL
          // path->oLast      --> 0
