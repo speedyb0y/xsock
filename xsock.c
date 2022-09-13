@@ -691,12 +691,12 @@ static int __init xsock_init (void) {
             path->reserved1 = 0;
             path->reserved2 = 0;
 #endif
-     memcpy(path->eDst,    this->gw,  ETH_ALEN);
-     memcpy(path->eSrc,    this->mac, ETH_ALEN);
+     memcpy(path->eDst,         this->gw,  ETH_ALEN);
+     memcpy(path->eSrc,         this->mac, ETH_ALEN);
             path->eType       = BE16(ETH_P_IP);
             path->iVersionTOS = BE16(0x4500U);
-     path->iAddrs[0] =   this->addr32;
-     path->iAddrs[1] =   peer->addr32;
+            path->iAddrs[0]   = this->addr32;
+            path->iAddrs[1]   = peer->addr32;
 
             net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
