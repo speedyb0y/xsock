@@ -520,15 +520,14 @@ uint pid = conn->pid;
            wire->ports[0]         = BE16(XSOCK_PORT);
            wire->ports[1]         = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
-           wire->iAddrs[0]    = path->iAddrs[0];
-           wire->iAddrs[1]    = path->iAddrs[1];
+    *(u64*)wire->iAddrs       = *(u64*)path->iAddrs;
            wire->iCID         = BE16(cid);
            wire->iSize        = BE16(ipSize);
            wire->iTTLProtocol = TTL_UDP;
            wire->iChecksum    = 0;
            wire->iChecksum    = ip_fast_csum(WIRE_IP(wire), 5);
-   ((u64*)WIRE_ETH(wire))[0] =      ((u64*)(&path->eDst))[0];
-   ((u64*)WIRE_ETH(wire))[1] =      ((u64*)(&path->eDst))[1];
+   ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
+   ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
