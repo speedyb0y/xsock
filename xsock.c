@@ -501,13 +501,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
 #endif
         ) { // ACHOU UM PATH USAVEL
-            u64 oRemaining = path->oRemaining;
-
-            oRemaining -= O_PKTS_UNIT;
             
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
-            if (oRemaining >= 0xFFFFFFFFULL) {
-                oRemaining = now >= path->oLast
+            if (path->oRemaining < O_PKTS_UNIT) {
+                u64 oRemaining = now >= path->oLast
                         ? now - path->oLast
                         : path->oLast - now // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
                     ;
@@ -521,18 +518,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                     // MAS SÓ PELA METADE PARA COMPENSAR O FATO DE JA TER ULTRAPASSADO
                     // O QUE IMPORTA É QUE NÃO SE TRANSFORME NUMA LOUCURA DE ENVIAR 1 PACOTE EXCEDENTE EM CADA PATH
                     oRemaining = ((u64)path->oPkts*HZ)/2;
-                // SALVA                
+                // SALVA
+                path->oRemaining = oRemaining;
                 path->oLast = now;
-            }
-
-            else { // JA ESTOUROU O LIMITE; ESTÁ USANDO ESTE PATH POIS NÃO TEM OUTROS
-                //                
-                path->oLast = now - HZ/2;
-                oRemaining = ((u64)(path->oPkts*HZ))/2;
-            }
-
-            // SALVA
-            path->oRemaining = oRemaining;
+            } else
+                // SALVA
+                path->oRemaining -= O_PKTS_UNIT;
 
             break;
         }
