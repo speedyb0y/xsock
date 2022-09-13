@@ -515,8 +515,9 @@ uint pid = conn->pid;
     // RE-ENCAPSULATE
     // SALVA ANTES DE SOBRESCREVER
            wire->tSeq2       = wire->tSeq;
-           wire->uSize       = BE16(ipSize - 20);
            wire->uChecksum   = 0;
+           wire->iAddrs[0]   = path->iAddrs[0];
+           wire->iAddrs[1]   = path->iAddrs[1];
 #if XSOCK_SERVER
            wire->ports[0]    = BE16(PORT(hid, pid));
            wire->ports[1]    = path->cport; // THE CLIENT IS BEHIND NAT
@@ -524,9 +525,9 @@ uint pid = conn->pid;
            wire->ports[0]    = BE16(XSOCK_PORT);
            wire->ports[1]    = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
-    *(u64*)wire->iAddrs      = *(u64*)path->iAddrs;
            wire->iCID        = BE16(cid);
            wire->iSize       = BE16(ipSize);
+           wire->uSize       = BE16(ipSize - 20);
            wire->iTTL        = 64;
            wire->iProtocol   = IPPROTO_UDP;
            wire->iChecksum   = 0;
