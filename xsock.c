@@ -506,7 +506,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             if (path->oRemaining < O_PKTS_UNIT) {
                 // ESSE PATH JÁ ESTOUROU O LIMITE
                 // GET THE ELAPSED JIFFES
-                u64 pkts = (now > path->oLast)
+                u64 pkts = now >= path->oLast
                         ?   now - path->oLast
                         : 0 // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
                     ;
