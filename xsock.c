@@ -142,8 +142,7 @@ typedef struct xsock_wire_s {
     u8  eDst[ETH_ALEN];
     u8  eSrc[ETH_ALEN];
     u16 eType;
-    u8  iVersion;
-    u8  iTOS;
+    u16 iVersionTOS;
     u16 iSize;
     u16 iCID; // CONNECTION ID (CLIENT SOURCE (EPHEMERAL) PORT)
     u16 iFrag;
