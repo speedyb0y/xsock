@@ -375,13 +375,13 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
 #if XSOCK_SERVER
     wire->iAddrs[0] = BE32(ADDR_CLT + hid);
-    wire->iAddrs[1] = BE32(ADDR_SRV);
     wire-> ports[0] = BE16(cid);
+    wire->iAddrs[1] = BE32(ADDR_SRV);
     wire-> ports[1] = BE16(XSOCK_PORT);
 #else
     wire->iAddrs[0] = BE32(ADDR_SRV);
-    wire->iAddrs[1] = BE32(ADDR_CLT + hid);
     wire-> ports[0] = BE16(XSOCK_PORT);
+    wire->iAddrs[1] = BE32(ADDR_CLT + hid);
     wire-> ports[1] = BE16(cid);
 #endif
     wire->iTTLProtocol = TTL_TCP;
