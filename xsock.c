@@ -190,10 +190,10 @@ typedef struct xsock_path_s {
     u64 reserved2;
 #endif
     //struct xsock_path_eth_s {
-        u8  gw [ETH_ALEN];
-        u8  mac[ETH_ALEN];
-        u16 type;
-        u16 vertos;
+    u8  edst[ETH_ALEN];
+    u8  mac[ETH_ALEN];
+    u16 type;
+    u16 vertos;
     //} eth;
     union { u8 saddr[4]; u32 saddr32; };
     union { u8 daddr[4]; u32 daddr32; };
