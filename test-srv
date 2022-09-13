@@ -2,7 +2,7 @@
 
 ISP_MTU=1492
 
-#(make && insmod xsock-srv.ko)
+(make && insmod xsock-srv.ko)
 
 #echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
 echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering

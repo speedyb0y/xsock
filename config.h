@@ -1,8 +1,8 @@
 
-#define VPS_A 104
-#define VPS_B 238
-#define VPS_C 128
-#define VPS_D 121
+#define VPS_A 45
+#define VPS_B 77
+#define VPS_C 217
+#define VPS_D 77
 
 //#define XCONF_XSOCK_HOST_ID 0
 //#define IP_0_D 50
@@ -21,7 +21,7 @@
 #define IP_0_D 20
 #define IP_1_C 100
 #define IP_1_D 20
-#define IP_2_C 2
+#define IP_2_C 1
 #define IP_2_D 20
 #define ITFC0 "eth0"
 #define ITFC1 "eth0"

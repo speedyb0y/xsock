@@ -1,5 +1,6 @@
 #!/bin/bash
 
+XSOCK_HOST=1
 TABLE_XSOCK=5
 
 (make && insmod xsock-clt.ko)
@@ -17,8 +18,8 @@ ISP_MTU=1492
 ip -4 rule add priority 10 table ${TABLE_XSOCK} to 192.0.0.0/24
 ip -4 rule add priority 10 table ${TABLE_XSOCK} from 192.0.0.0/24
 ip -4 rule add priority 10 table ${TABLE_XSOCK} oif xsock
-ip -4 addr add dev xsock 192.0.0.${XCONF_XSOCK_HOST_ID}
+ip -4 addr add dev xsock 192.0.0.${XSOCK_HOST}
 #rttvar TIME (Linux 2.3.15+ only)
 #ssthresh NUMBER (Linux 2.3.15+ only)
-ip -4 route add table ${TABLE_XSOCK} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 192.0.0.${XCONF_XSOCK_HOST_ID} 192.0.0.255 rtt 210ms rto_min 320ms
+ip -4 route add table ${TABLE_XSOCK} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 192.0.0.${XSOCK_HOST} 192.0.0.255 rtt 210ms rto_min 320ms
 ip -4 route flush cache
