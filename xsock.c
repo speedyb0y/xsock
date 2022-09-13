@@ -359,7 +359,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
           memcpy(path->eDst,      wire->eSrc, ETH_ALEN);
           memcpy(path->eSrc,      wire->eDst, ETH_ALEN);
                  path->eType    = wire->eType;
-                 path->iVersionTOS = 0x0045U;
+                 path->iVersionTOS = BE16(0x4500U);
                  path->saddr32  = wire->iAddrs[0];
                  path->daddr32  = wire->iAddrs[1];
                  path->cport    = wire->ports[0];
@@ -374,8 +374,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
-    wire->tSeq      = wire->tSeq2;
-    wire->tSeq2     = 0;
 #if XSOCK_SERVER
     wire->iAddrs[0] = BE32(ADDR_CLT + hid);
     wire-> ports[0] = BE16(cid);
@@ -391,6 +389,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     wire->iSize     = BE16(ipSize);
     wire->iChecksum = 0;
     wire->iChecksum = ip_fast_csum(WIRE_IP(wire), 5);
+    wire->tSeq      = wire->tSeq2;
+    wire->tSeq2     = 0;
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = WIRE_IP(wire);
@@ -695,8 +695,8 @@ static int __init xsock_init (void) {
 #endif
      memcpy(path->eDst,    this->gw,  ETH_ALEN);
      memcpy(path->eSrc,    this->mac, ETH_ALEN);
-            path->eType    = BE16(ETH_P_IP);
-            path->iVersionTOS = 0x0045U;
+            path->eType       = BE16(ETH_P_IP);
+            path->iVersionTOS = BE16(0x4500U);
      memcpy(path->saddr,   this->addr, 4);
      memcpy(path->daddr,   peer->addr, 4);
 
