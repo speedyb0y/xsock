@@ -173,50 +173,16 @@ typedef u32 wire_hash_t;
 // EXPECTED SIZE
 #define XSOCK_PATH_SIZE CACHE_LINE_SIZE
 
-
-opkts = ((50*1000*1000) << 8)/1500
-mas se isso é por segundo, entao converte esse optks para jiffies
-opkts = ((50*1000*1000) << 8)/(1500*HZ) ?
-
-na verdade ao inves de oPkts vai ter que guardar o oMax
-pois este sera o maximo que pode armazenar no oRemaining
-vai capear a isso
-
-const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
-SE oLast > now
-    entao passou o tempo
-    considerar isso uns 60 segundos
-    
-oRemaining += (elapsedJiffies * oPkts) //  este oPkts calcualdo com << 4
-mas ao ler o oRemaining, usar um (oRemaining >> 4)
-ou a cada pacote que enviar, abater oRemaining -= (1 << 4)
-assim aguenta um numero fracionario e mais preciso
-
-
-// ao enviar um pacote
-// se der overflow, é porque esgotou
-    oRemaining -= 1 << 8;
-if (oRemaining > oMax)
-    oRemaining = 0;
-
-//
-recuperou = elapsedJiffies * oPkts;
-// se der overflow ao aumentar, enetao chegou ao limite
-if (((u64)oRemaining + recuperou) <= (u64)oMax)
-    oRemaining += recuperou;
-else
-    oRemaining = oMax;
-
 // o oBurst é relativo a conexao enao tem q ue er uma macro global pois é especifico da atividade do servico
 //   -> diferenciar ela entre o servidor e o cliente
 typedef struct xsock_path_s {
     net_device_s* itfc;
-    u32 oLast; // ULTIMA VEZ QUE ENVIOU - O PKTS ESTA NESTE PONTO
-    u32 oRemaining; // ISSO É PARA SER POR CONEXÃO  QUANTO TEMPO (EM JIFFIES) CONSIDERAR NOVOS PACOTES PARTES DO MESMO BURST E PORTANTO PERMANECER NESTE PATH
-    u32 oPkts; // QUANTOS PACOTES INCREMENTAR O oRemaining A CADA JIFFIE
+    u32 oLast; // ULTIMA VEZ QUE ENVIOU - ENTAO DE LA ATE NOW PASSARAM-SE N DIFFIES
+    u32 oRemaining;
+    u32 oMax;
 #if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
     u16 cport;
-    u16 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO    
+    u16 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
     u64 iActive; //  [IN LAST]  ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
@@ -494,47 +460,84 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_conn_s* const conn = &host->conns[cid];
 
+	const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
+
+	uint pid = conn->pid;
+
     // TODO: FIXME: NO CLIENTE, SALVAR O ACK&SEQ DO SYN COMO BASE DO KEY
+    // FORCE PATH CHANGING
     if (wire->tFlags & XSOCK_WIRE_TCP_SYN)
-        conn->cdown = 3*XSOCK_PATHS_N;
+        conn->cdown = XSOCK_PATHS_N;
 
-    if (conn->cdown) {
-        conn->cdown--;
-        conn->pkts = 0;
-    }
-
-uint pid = conn->pid;
-    const xsock_path_s* path = &host->paths[pid];
-
-    const u64 now = jiffies;
-
-    // CHOOSE PATH
-    if (conn->pkts == 0
+	if (conn->cdown
      || conn->burst < now
-     || conn->limit < now
-#if XSOCK_SERVER
-     || path->iActive < now
-#endif
-     || path->itfc == NULL
-   || !(path->itfc->flags & IFF_UP)) {
+     || conn->limit < now)
+		pid = (pid + 1) % XSOCK_PATHS_N;
 
-        // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
-        uint c = XSOCK_PATHS_N;
+	if (conn->cdown)
+		conn->cdown--;
 
-        do { // PATH INUSABLE
-            if (!c--)
-                // NENHUM PATH DISPONÍVEL
-                goto drop;
-            // GO TO NEXT PATH
-            path = &host->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
-        } while (!(
-            path->oPkts
+	// TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
+	uint c = XSOCK_PATHS_N;
+        
+    xsock_path_s* path;
+
+	// CHOOSE PATH
+    loop {
+		path = &host->paths[pid];
+
+        if (path->oPkts
 #if XSOCK_SERVER
          && path->iActive >= now
 #endif
          && path->itfc
          && path->itfc->flags & IFF_UP
-        ));
+        ) { // ACHOU UM PATH USAVEL
+
+			// 
+			if (path->oRemaining < (1U << 8)) {
+				// GET THE ELAPSED JIFFES
+				u64 pkts = (now > path->oLast)
+						?   now - path->oLast
+						: 0	// OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
+					;
+				// HOW MANY PACKETS RECOVERED
+				pkts *= path->oPkts;
+				//
+				pkts += path->oRemaining;
+				// BUT CAP TO THE MAX
+				if (pkts > path->oPkts)
+					pkts = path->oPkts;
+				// SALVA
+				path->oRemaining = pkts;
+				path->oLast = now;
+			}
+
+			if (path->oRemaining >= (1U << 8)) {
+				path->oRemaining -= 1U << 8;
+				break;
+			}
+		}
+
+		// PATH INUSABLE
+		
+		if (!c--)
+			// NENHUM PATH DISPONÍVEL
+			goto drop;
+			
+		// GO TO NEXT PATH
+		path = &host->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
+	}
+
+    
+    if (
+
+#if XSOCK_SERVER
+     || path->iActive < now
+#endif
+     || path->itfc == NULL
+   || !(path->itfc->flags & IFF_UP)) 
+
 
         //
         if (conn->pid !=        pid) {
@@ -542,8 +545,7 @@ uint pid = conn->pid;
             conn->pkts  =       path->oPkts;
             conn->limit = now + path->oTime*HZ;
         }
-    } else
-        conn->pkts--;
+
 
     conn->burst = now + path->oBurst;
 
@@ -719,21 +721,29 @@ static int __init xsock_init (void) {
                 _MAC(this->eDst), _IP4(peer->addr32)
             );
 
-         // path->itfc      --> NULL
-            path->oPkts     = this->oPkts;
-            path->oBurst    = this->oBurst;
-            path->oTime     = this->oTime;
+			//oPkts = this->oPkts ????;
+			// PEGA A LARGURA DE BANDA POSSÍVEL EM UM SEGUNDO
+			// TRANSFORMA NO NÚMERO DE PACOTES
+			// MAS FAZ ISSO COM 8 BITS A MAIS DE PRECISAO:
+			//		ISSO/(2^8) = NUMERO REAL
+			// ESTE VALOR É A QUANTIDADE DE PACOTES POR SEGUNDO.
+			// DIVIDE ELE PELA QUANTIDADE DE JIFFIES EM UM SEGUNDO.
+			// ESTE VALOR É A QUANTIDADE DE PACOTES QUE PODE PASSAR DURANTE UM JIFFIE.
+			const uint oPkts = (((uint)(50*1000*1000)) << 8)/(1500*HZ);
+
+         // path->itfc       --> NULL
+         // path->oLast      --> 0
+         // path->oRemaining --> 0
+            path->oPkts     = oPkts;
 #if XSOCK_SERVER
-         // path->iHash     --> 0
-         // path->iActive   --> 0
-            path->iTimeout  = this->iTimeout;
-         // path->reserved0 --> 0
          // path->cport     --> 0
+            path->iTimeout  = this->iTimeout;
+         // path->iActive   --> 0
+         // path->iHash     --> 0
 #else
          // path->reserved0 --> 0
          // path->reserved1 --> 0
          // path->reserved2 --> 0
-         // path->reserved3 --> 0
 #endif
             path->eDst[0]     = this->eDst[0];
             path->eDst[1]     = this->eDst[1];
