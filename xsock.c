@@ -173,19 +173,28 @@ typedef u32 wire_hash_t;
 // EXPECTED SIZE
 #define XSOCK_PATH_SIZE CACHE_LINE_SIZE
 
+const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
+SE oLast > now
+    entao passou o tempo
+    considerar isso uns 60 segundos
+    
+oRemaining += (elapsedJiffies * oPkts) //  este oPkts calcualdo com << 4
+mas ao ler o oRemaining, usar um (oRemaining >> 4)
+assim aguenta um numero fracionario e mais preciso
+
+// o oBurst é relativo a conexao enao tem q ue er uma macro global pois é especifico da atividade do servico
+//   -> diferenciar ela entre o servidor e o cliente
 typedef struct xsock_path_s {
     net_device_s* itfc;
-    u32 oBurst; // QUANTO TEMPO (EM JIFFIES) CONSIDERAR NOVOS PACOTES PARTES DO MESMO BURST E PORTANTO PERMANECER NESTE PATH
-    u32 oPkts; // MÁXIMO DE PACOTES A ENVIAR ATÉ PASSAR PARA OUTRO PATH
-    u16 oTime; // MÁXIMO DE TEMPO (EM SEGUNDOS) ATÉ PASSAR PARA OUTRO PATH
+    u32 oLast; // ULTIMA VEZ QUE ENVIOU - O PKTS ESTA NESTE PONTO
+    u32 oRemaining; // ISSO É PARA SER POR CONEXÃO  QUANTO TEMPO (EM JIFFIES) CONSIDERAR NOVOS PACOTES PARTES DO MESMO BURST E PORTANTO PERMANECER NESTE PATH
+    u32 oPkts; // QUANTOS PACOTES INCREMENTAR O oRemaining A CADA JIFFIE
 #if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
     u16 cport;
-    u16 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
-    u16 reserved0;
-    u64 iActive; // ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
+    u16 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO    
+    u64 iActive; //  [IN LAST]  ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
-    u16 reserved0;
     u32 reserved1;
     u64 reserved2;
     u64 reserved3;
@@ -315,7 +324,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
      || srvPort > PORT(XSOCK_HOSTS_N - 1,
                        XSOCK_PATHS_N - 1))
 #else
-    if (cltPort != BE16(XSOCK_PORT))
+    if (cltPort != XSOCK_PORT)
 #endif
         return RX_HANDLER_PASS;
 
