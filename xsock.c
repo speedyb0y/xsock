@@ -494,7 +494,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         if (path->oPkts
          && path->itfc
          && path->itfc->flags & IFF_UP
-        // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDS
+        // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
         && (path->oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
 #if XSOCK_SERVER
         // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
@@ -520,8 +520,15 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                 // SALVA
                 path->oRemaining = pkts;
                 path->oLast = now;
-            } else
+            }
+
+            if (path->oRemaining >= O_PKTS_UNIT)
                 path->oRemaining -= O_PKTS_UNIT;
+            else { // JA ESTOUROU O LIMITE; ESTÁ USANDO ESTE PATH POIS NÃO TEM OUTROS
+                //
+                path->oRemaining = ((u64)(path->oPkts*HZ))/2;
+                path->oLast = now - HZ/2;
+            }
 
             break;
         }
