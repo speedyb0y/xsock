@@ -204,14 +204,12 @@ typedef struct xsock_path_s {
 #endif
 
 // EXPECTED SIZE
-#define XSOCK_CONN_SIZE 16
+#define XSOCK_CONN_SIZE 8
 
 typedef struct xsock_conn_s {
-    u64 burst; //
-    u32 reserved0;
-    u16 reserved1;
-    u8 cdown;
-    u8 pid;
+    u64 burst:58,
+        cdown:3,
+        pid:3;
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
@@ -435,16 +433,16 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
     if (WIRE_ETH(wire) < SKB_HEAD(skb)
-          || wire->iProtocol != IPPROTO_TCP
+      || wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
-          || wire->iAddrs[0] != BE32(ADDR_SRV)
-          || wire-> ports[0] != BE16(XSOCK_PORT)
+      || wire->iAddrs[0] != BE32(ADDR_SRV)
+      || wire-> ports[0] != BE16(XSOCK_PORT)
 #else
-          || wire->iAddrs[0] != BE32(ADDR_CLT | XSOCK_HOST_ID)
-          || wire->iAddrs[1] != BE32(ADDR_SRV)
-          || wire-> ports[1] != BE16(XSOCK_PORT)
+      || wire->iAddrs[0] != BE32(ADDR_CLT | XSOCK_HOST_ID)
+      || wire->iAddrs[1] != BE32(ADDR_SRV)
+      || wire-> ports[1] != BE16(XSOCK_PORT)
 #endif
-    )
+    ) // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
         goto drop;
 
 #if XSOCK_SERVER
@@ -466,19 +464,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
 
-    uint pid = conn->pid;
-
     // TODO: FIXME: NO CLIENTE, SALVAR O ACK&SEQ DO SYN COMO BASE DO KEY
     // FORCE PATH CHANGING
-    if (wire->tFlags & XSOCK_WIRE_TCP_SYN)
-        conn->cdown = XSOCK_PATHS_N;
+    uint cdown = (wire->tFlags & XSOCK_WIRE_TCP_SYN)
+        ? XSOCK_PATHS_N
+        : conn->cdown;
 
-	// SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
-    pid += (conn->cdown
-		 || conn->burst < now);
-
-    if (conn->cdown)
-        conn->cdown--;
+    // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
+    uint pid = conn->pid + (cdown || conn->burst < now);
 
     // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
     uint c = XSOCK_PATHS_N;
@@ -499,7 +492,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #define O_PKTS_UNIT (1U << O_PKTS_SHIFT)
             //
             if (path->oRemaining < O_PKTS_UNIT) {
-				
+
                 // GET THE ELAPSED JIFFES
                 u64 pkts = (now > path->oLast)
                         ?   now - path->oLast
@@ -527,11 +520,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             // NENHUM PATH DISPONÍVEL
             goto drop;
         // GO TO NEXT PATH
-		pid++;
+        pid++;
     }
 
     //
     conn->pid = pid;
+    conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
 
     // TODO: CONFIRM WE HAVE THIS FREE SPACE
@@ -675,13 +669,12 @@ static int __init xsock_init (void) {
         printk_host("INITIALIZING\n");
 
         // INITIALIZE CONNECTIONS
-        for (cid, XSOCK_CONNS_N) {
-			xsock_path_s* const
-			conn = &host->conns[cid];
-			conn->pid	= pid;
-			conn->burst = 0;
-			conn->cdown = 0;
-		}
+        foreach (cid, XSOCK_CONNS_N) {
+            xsock_conn_s* const conn = &host->conns[cid];
+            conn->pid   = cid % XSOCK_PATHS_N;
+            conn->burst = 0;
+            conn->cdown = 0;
+        }
 
         // INITIALIZE PATHS
         foreach (pid, XSOCK_PATHS_N) {
