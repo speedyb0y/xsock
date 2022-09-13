@@ -491,7 +491,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     xsock_path_s* path;
 
     loop { path = &host->paths[(pid %= XSOCK_PATHS_N)];
-
+printk("c %u TENTANDO PATH %u\n", c, pid);
         if (path->oPkts
          && path->itfc
          && path->itfc->flags & IFF_UP
