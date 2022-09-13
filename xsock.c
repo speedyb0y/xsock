@@ -197,6 +197,9 @@ typedef struct xsock_path_s {
     u32 iAddrs[2];
 } xsock_path_s;
 
+#define O_PKTS_SHIFT 11
+#define O_PKTS_UNIT (1U << O_PKTS_SHIFT)
+
 #if XSOCK_SERVER
 #define CONN_BURST (HZ/4)
 #else
@@ -486,8 +489,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
          && path->itfc
          && path->itfc->flags & IFF_UP
         ) { // ACHOU UM PATH USAVEL
-#define O_PKTS_SHIFT 11
-#define O_PKTS_UNIT (1U << O_PKTS_SHIFT)
+
             //
             if (path->oRemaining < O_PKTS_UNIT) {
 
