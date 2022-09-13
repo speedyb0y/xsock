@@ -189,12 +189,10 @@ typedef struct xsock_path_s {
     u64 reserved1;
     u64 reserved2;
 #endif
-    //struct xsock_path_eth_s {
-    u8  edst[ETH_ALEN];
-    u8  mac[ETH_ALEN];
-    u16 type;
-    u16 vertos;
-    //} eth;
+    u8  eDst[ETH_ALEN];
+    u8  eSrc[ETH_ALEN];
+    u16 eType;
+    u16 iVersionTOS;
     union { u8 saddr[4]; u32 saddr32; };
     union { u8 daddr[4]; u32 daddr32; };
 } xsock_path_s;
@@ -360,9 +358,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-          memcpy(path->gw,        wire->eSrc, ETH_ALEN);
-          memcpy(path->mac,       wire->eDst, ETH_ALEN);
-                 path->type     = wire->eType;
+          memcpy(path->eDst,      wire->eSrc, ETH_ALEN);
+          memcpy(path->eSrc,      wire->eDst, ETH_ALEN);
+                 path->eType    = wire->eType;
                  path->saddr32  = wire->iDst32;
                  path->daddr32  = wire->iSrc32;
                  path->cport    = wire->uSrc;
@@ -371,8 +369,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u ->"
             " %02X:%02X:%02X:%02X:%02X:%02X %u.%u.%u.%u %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->mac), _IP4(path->saddr), BE16(wire->uDst),
-            _MAC(path->gw),  _IP4(path->daddr), BE16(path->cport));
+            _MAC(path->eSrc), _IP4(path->saddr), BE16(wire->uDst),
+            _MAC(path->eDst), _IP4(path->daddr), BE16(path->cport));
     }
 #endif
 
@@ -535,8 +533,8 @@ uint pid = conn->pid;
            wire->iTTLProtocol = TTL_UDP;
            wire->iChecksum    = 0;
            wire->iChecksum    = ip_fast_csum(WIRE_IP(wire), 5);
-   ((u64*)WIRE_ETH(wire))[0] =      ((u64*)(&path->gw))[0];
-   ((u64*)WIRE_ETH(wire))[1] =      ((u64*)(&path->gw))[1];
+   ((u64*)WIRE_ETH(wire))[0] =      ((u64*)(&path->eDst))[0];
+   ((u64*)WIRE_ETH(wire))[1] =      ((u64*)(&path->eDst))[1];
 
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
@@ -699,11 +697,12 @@ static int __init xsock_init (void) {
             path->reserved1 = 0;
             path->reserved2 = 0;
 #endif
-     memcpy(path->mac,    this->mac, ETH_ALEN);
-     memcpy(path->gw,     this->gw,  ETH_ALEN);
-            path->type    = BE16(ETH_P_IP);
-     memcpy(path->saddr,      this->addr, 4);
-     memcpy(path->daddr,      peer->addr, 4);
+     memcpy(path->eDst,    this->gw,  ETH_ALEN);
+     memcpy(path->eSrc,    this->mac, ETH_ALEN);
+            path->eType    = BE16(ETH_P_IP);
+            path->iVersionTOS = 0x0045U;
+     memcpy(path->saddr,   this->addr, 4);
+     memcpy(path->daddr,   peer->addr, 4);
 
             net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
