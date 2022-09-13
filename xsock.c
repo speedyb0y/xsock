@@ -474,8 +474,17 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         : conn->cdown;
     // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
     uint pid = conn->pid + (cdown || conn->burst < now);
-    // TRY THIS ONE AGAIN AS IT MAY BE OKAY, JUST BURSTED OUT
-    uint c = XSOCK_PATHS_N;
+
+#if XSOCK_SERVER
+#define TRY_OK                   (3*XSOCK_PATHS_N)
+#define TRY_OK_EXCEEDS           (2*XSOCK_PATHS_N)
+#define TRY_OK_EXCEEDS_INACTIVES (1*XSOCK_PATHS_N)
+#else
+#define TRY_OK                   (2*XSOCK_PATHS_N)
+#define TRY_OK_EXCEEDS           (1*XSOCK_PATHS_N)
+#endif
+
+    uint c = TRY_OK;
 
     // CHOOSE PATH
     xsock_path_s* path;
@@ -483,16 +492,19 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     loop { path = &host->paths[(pid %= XSOCK_PATHS_N)];
 
         if (path->oPkts
-#if XSOCK_SERVER
-         && path->iActive >= now
-#endif
          && path->itfc
          && path->itfc->flags & IFF_UP
+        // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDS
+        && (path->oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
+#if XSOCK_SERVER
+        // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
+        && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
+#endif
         ) { // ACHOU UM PATH USAVEL
 
             //
             if (path->oRemaining < O_PKTS_UNIT) {
-
+                // ESSE PATH JÁ ESTOUROU O LIMITE
                 // GET THE ELAPSED JIFFES
                 u64 pkts = (now > path->oLast)
                         ?   now - path->oLast
@@ -508,17 +520,17 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                 // SALVA
                 path->oRemaining = pkts;
                 path->oLast = now;
-            }
-
-            if (path->oRemaining >= O_PKTS_UNIT) {
+            } else
                 path->oRemaining -= O_PKTS_UNIT;
-                break;
-            }
+
+            break;
         }
+
         // PATH INUSABLE
         if (!--c)
             // NENHUM PATH DISPONÍVEL
             goto drop;
+
         // GO TO NEXT PATH
         pid++;
     }
