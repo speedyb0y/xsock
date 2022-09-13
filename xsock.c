@@ -139,8 +139,8 @@ typedef struct net_device_ops net_device_ops_s;
 
 typedef struct xsock_wire_s {
     u16 _align;
-    u8  eDst[ETH_ALEN];
-    u8  eSrc[ETH_ALEN];
+    u16 eDst[ETH_ALEN/sizeof(u16)];
+    u16 eSrc[ETH_ALEN/sizeof(u16)];
     u16 eType;
     u16 iVersionTOS;
     u16 iSize;
