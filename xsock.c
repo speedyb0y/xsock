@@ -103,6 +103,14 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 #ifdef __BIG_ENDIAN
+#define TTL_UDP 0x4011U
+#define TTL_TCP 0x4006U
+#else
+#define TTL_UDP 0x1140U
+#define TTL_TCP 0x0640U
+#endif
+
+#ifdef __BIG_ENDIAN
 #define XSOCK_WIRE_TCP_CWR 0b0000000010000000U
 #define XSOCK_WIRE_TCP_ECE 0b0000000001000000U
 #define XSOCK_WIRE_TCP_URG 0b0000000000100000U
@@ -139,8 +147,7 @@ typedef struct xsock_wire_s {
     u16 iSize;
     u16 iCID; // CONNECTION ID (CLIENT SOURCE (EPHEMERAL) PORT)
     u16 iFrag;
-    u8  iTTL;
-    u8  iProtocol;
+    u16 iTTLProtocol;
     u16 iChecksum;
     union { u8 iSrc[4]; u32 iSrc32; };
     union { u8 iDst[4]; u32 iDst32; };
@@ -300,7 +307,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 || WIRE_ETH(wire) < SKB_HEAD(skb)
          || wire->eType    != BE16(ETH_P_IP)
          || wire->iVersion  != 0x45
-         || wire->iProtocol != IPPROTO_UDP)
+         //|| wire->iProtocol != IPPROTO_UDP
+         )
         return RX_HANDLER_PASS;
 
     // IDENTIFY HOST, PATH AND CONN
@@ -370,7 +378,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // RE-ENCAPSULATE
-    wire->iProtocol = IPPROTO_TCP;
+    wire->iTTLProtocol = TTL_TCP;
     wire->iSize     = BE16(ipSize);
     wire->iChecksum = 0;
 #if XSOCK_SERVER
@@ -424,7 +432,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
        - sizeof(*wire);
 
     if (WIRE_ETH(wire) < PTR(skb->head)
-          || wire->iProtocol != IPPROTO_TCP
+          //|| wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
           || wire->iSrc32   != BE32(ADDR_SRV)
           || wire->uSrc    != BE16(XSOCK_PORT)
@@ -525,7 +533,7 @@ uint pid = conn->pid;
            wire->iDst32       = path->daddr32;
            wire->iCID         = BE16(cid);
            wire->iSize        = BE16(ipSize);
-           wire->iProtocol    = IPPROTO_UDP;
+           wire->iTTLProtocol = TTL_UDP;
            wire->iChecksum    = 0;
            wire->iChecksum    = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] =      ((u64*)(&path->gw))[0];
