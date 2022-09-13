@@ -346,7 +346,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
       + *(u64*)wire->eDst // VAI PEGAR UM PEDAÇO DO eSrc
       + *(u64*)wire->eSrc // VAI PEGAR O eType
       + *(u64*)wire->iAddrs // VAI PEGAR O iDst
-      +        wire->ports[0]
+      + *(u32*)wire->ports
     ;
 
     xsock_host_s* const host = &hosts[hid];
