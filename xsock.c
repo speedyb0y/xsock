@@ -702,7 +702,7 @@ static int __init xsock_init (void) {
                 " %04X%04X%04X 0x%08X\n",
                 pid,
                 CONN_BURST,
-                this->oPkts, oPkts,
+                this->oPkts, oPkts/O_PKTS_UNIT,
                 this->iTimeout,
                 this->itfc,
                 _MAC(this->eSrc), _IP4(this->addr32),
