@@ -217,8 +217,8 @@ typedef struct xsock_cfg_path_s {
     uint oPkts;
     uint iTimeout;
     uint port;
-    u8   mac[ETH_ALEN];
-    u8   gw[ETH_ALEN];
+    union { u8 mac[ETH_ALEN]; u16 eSrc[ETH_ALEN/sizeof(u16)]; };
+    union { u8 gw [ETH_ALEN]; u16 eDst[ETH_ALEN/sizeof(u16)]; };
     union { u8 addr[4]; u32 addr32; };
 } xsock_cfg_path_s;
 
@@ -694,8 +694,12 @@ static int __init xsock_init (void) {
             path->reserved1 = 0;
             path->reserved2 = 0;
 #endif
-     memcpy(path->eDst,         this->gw,  ETH_ALEN);
-     memcpy(path->eSrc,         this->mac, ETH_ALEN);
+            path->eDst[0]     = this->eSrc[0];
+            path->eDst[1]     = this->eSrc[1];
+            path->eDst[2]     = this->eSrc[2];
+            path->eSrc[0]     = this->eDst[0];
+            path->eSrc[1]     = this->eDst[1];
+            path->eSrc[2]     = this->eDst[2];     
             path->eType       = BE16(ETH_P_IP);
             path->iVersionTOS = BE16(0x4500U);
             path->iAddrs[0]   = this->addr32;
