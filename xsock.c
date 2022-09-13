@@ -192,6 +192,21 @@ mas ao ler o oRemaining, usar um (oRemaining >> 4)
 ou a cada pacote que enviar, abater oRemaining -= (1 << 4)
 assim aguenta um numero fracionario e mais preciso
 
+
+// ao enviar um pacote
+// se der overflow, é porque esgotou
+    oRemaining -= 1 << 8;
+if (oRemaining > oMax)
+    oRemaining = 0;
+
+//
+recuperou = elapsedJiffies * oPkts;
+// se der overflow ao aumentar, enetao chegou ao limite
+if (((u64)oRemaining + recuperou) <= (u64)oMax)
+    oRemaining += recuperou;
+else
+    oRemaining = oMax;
+
 // o oBurst é relativo a conexao enao tem q ue er uma macro global pois é especifico da atividade do servico
 //   -> diferenciar ela entre o servidor e o cliente
 typedef struct xsock_path_s {
