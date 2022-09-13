@@ -491,7 +491,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     xsock_path_s* path;
 
     loop { path = &host->paths[(pid %= XSOCK_PATHS_N)];
-printk("c %u TENTANDO PATH %u\n", c, pid);
+//printk("c %u TENTANDO PATH %u\n", c, pid);
         if (path->oPkts && path->itfc && path->itfc->flags & IFF_UP) {
             // ACHOU UM PATH EXISTENTE E OK
 
@@ -540,7 +540,7 @@ printk("c %u TENTANDO PATH %u\n", c, pid);
     }
 
     //
-printk("CONN %u conn->pid %u = pid %u | conn->cdown %u, cdown %u\n", cid, conn->pid, pid, conn->cdown, cdown);
+//printk("CONN %u conn->pid %u = pid %u | conn->cdown %u, cdown %u\n", cid, conn->pid, pid, conn->cdown, cdown);
     conn->pid = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
