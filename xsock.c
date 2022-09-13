@@ -529,24 +529,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         path = &host->paths[(pid = (pid + 1) % XSOCK_PATHS_N)];
     }
 
-    
-    if (
-
-#if XSOCK_SERVER
-     || path->iActive < now
-#endif
-     || path->itfc == NULL
-   || !(path->itfc->flags & IFF_UP)) 
-
-
-        //
-        if (conn->pid !=        pid) {
-            conn->pid  =        pid;
-            conn->pkts  =       path->oPkts;
-            conn->limit = now + path->oTime*HZ;
-        }
-
-
+	//
+	conn->pid = pid;
     conn->burst = now + path->oBurst;
 
     // TODO: CONFIRM WE HAVE THIS FREE SPACE
