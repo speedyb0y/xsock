@@ -492,16 +492,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     loop { path = &host->paths[(pid %= XSOCK_PATHS_N)];
 printk("c %u TENTANDO PATH %u\n", c, pid);
-        if (path->oPkts
-         && path->itfc
-         && path->itfc->flags & IFF_UP
-        // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
-        && (path->oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
-#if XSOCK_SERVER
-        // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
-        && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
-#endif
-        ) { // ACHOU UM PATH USAVEL
+        if (path->oPkts && path->itfc && path->itfc->flags & IFF_UP) {
+            // ACHOU UM PATH EXISTENTE E OK
 
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
             if (path->oRemaining < O_PKTS_UNIT) {
@@ -526,7 +518,16 @@ printk("c %u TENTANDO PATH %u\n", c, pid);
                 // SALVA
                 path->oRemaining -= O_PKTS_UNIT;
 
-            break;
+
+        // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
+        // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
+            if ((path->oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
+#if XSOCK_SERVER        
+            && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
+#endif
+            ) { // ACHOU UM PATH USAVEL
+                break;
+            }
         }
 
         // PATH INUSABLE
