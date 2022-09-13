@@ -508,7 +508,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
                 // GET THE ELAPSED JIFFES
                 u64 pkts = now >= path->oLast
                         ?   now - path->oLast
-                        : 0 // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
+                        : O_PKTS_UNIT // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
                     ;
                 // HOW MANY PACKETS RECOVERED
                 pkts *= path->oPkts;
