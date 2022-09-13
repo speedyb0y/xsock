@@ -540,7 +540,7 @@ uint pid = conn->pid;
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
-    skb->network_header   = WIRE_IP (wire)  - PTR(skb->head);
+    skb->network_header   = WIRE_IP (wire) - PTR(skb->head);
     skb->transport_header = WIRE_UDP(wire) - PTR(skb->head);
     skb->mac_len          = ETH_HLEN;
     skb->len              = ETH_HLEN + ipSize;
@@ -681,7 +681,7 @@ static int __init xsock_init (void) {
                 _MAC(this->gw),  _IP4(peer->addr32)
             );
 
-         // path->itfc      --> 0
+         // path->itfc      --> NULL
             path->oPkts     = this->oPkts;
             path->oBurst    = this->oBurst;
             path->oTime     = this->oTime;
