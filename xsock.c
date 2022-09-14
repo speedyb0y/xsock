@@ -379,13 +379,14 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->iAddrs[1] = wire->iAddrs[0];
                  path->iAddrs[0] = wire->iAddrs[1];
                  path->cport     = wire->ports[0];
-
+#if 0
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " 0x%04X%04X%04X 0x%08X %u ->"
             " 0x%04X%04X%04X 0x%08X %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
             _MAC(path->eSrc), _IP4(path->iAddrs[0]), BE16(wire->ports[1]),
             _MAC(path->eDst), _IP4(path->iAddrs[1]), BE16(path->cport));
+#endif
     }
 #endif
 
@@ -436,7 +437,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
-    if (WIRE_ETH(wire) < SKB_HEAD(skb)
+    // TODO: CONFIRM WE HAVE THIS FREE SPACE
+    const uint ipSize = skb->len + sizeof(wire_hash_t);
+
+    //if (BE16(wire->iSize) != skb->len)
+
+    if (PTR(wire) < SKB_HEAD(skb)
+     || WIRE_IP(wire) + ipSize > SKB_END(skb)
       || wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
       || wire->iAddrs[0] != BE32(ADDR_SRV)
@@ -478,6 +485,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         ))
         ? XSOCK_PATHS_N
         : conn->cdown;
+
     // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
     uint pid = (uint)conn->pid + (cdown || conn->burst < now);
 
@@ -496,7 +504,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     xsock_path_s* path;
 
     loop { path = &host->paths[(pid %= XSOCK_PATHS_N)];
-//printk("c %u TENTANDO PATH %u\n", c, pid);
+
         if (path->oPkts && path->itfc && path->itfc->flags & IFF_UP) {
             // ACHOU UM PATH EXISTENTE E OK
 
@@ -544,16 +552,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         pid++;
     }
 
-    //
-    if (conn->pid != pid)
-        printk("CONN %u conn->pid %u -> pid %u | conn->cdown %u -> cdown %u"
-        " | path->oRemaining %u\n", cid, conn->pid, pid, conn->cdown, cdown, path->oRemaining/O_PKTS_UNIT );
-    conn->pid = pid;
+    // STORE
+    conn->pid   = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
-
-    // TODO: CONFIRM WE HAVE THIS FREE SPACE
-    const uint ipSize = BE16(wire->iSize) + sizeof(wire_hash_t);
 
     // RE-ENCAPSULATE
     // SALVA ANTES DE SOBRESCREVER
@@ -598,6 +600,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     return NETDEV_TX_OK;
 
 drop:
+    printk("OUT DROP!!!\n");
     dev_kfree_skb(skb);
 
     return NETDEV_TX_OK;
