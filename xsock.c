@@ -459,9 +459,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
 
     xsock_host_s* const host = &hosts[hid];
-#endif
 
-#if XSOCK_SERVER
     const uint cid = BE16(wire->ports[1]);
 #else
     const uint cid = BE16(wire->ports[0]);
