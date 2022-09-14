@@ -34,7 +34,7 @@ typedef struct net_device_ops net_device_ops_s;
 #define SKB_HEAD(skb) PTR((skb)->head)
 #define SKB_DATA(skb) PTR((skb)->data)
 #define SKB_TAIL(skb) PTR(skb_tail_pointer(skb))
-#define SKB_END(skb) PTR(skb_end_pointer(skb))
+#define SKB_END(skb)  PTR(skb_end_pointer(skb))
 
 #define PTR(p) ((void*)(p))
 
@@ -434,12 +434,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (skb_linearize(skb))
         goto drop;
 
-    const uint ipSize = skb->len + sizeof(wire_hash_t);
-
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
-    if (WIRE_ETH(wire)          < SKB_HEAD(skb)
-      || WIRE_IP(wire) + ipSize > SKB_END(skb)
+    if (WIRE_ETH(wire) < SKB_HEAD(skb)
       || wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
       || wire->iAddrs[0] != BE32(ADDR_SRV)
@@ -500,7 +497,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             // ACHOU UM PATH EXISTENTE E OK
 
             u64 oRemaining = path->oRemaining;
-
+            
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
             if (oRemaining < O_PKTS_UNIT) {
                 u64 oRemaining = now >= path->oLast
@@ -518,7 +515,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
             // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
             if ((oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
-#if XSOCK_SERVER
+#if XSOCK_SERVER        
             && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
 #endif
             ) { // ACHOU UM PATH USAVEL
@@ -550,6 +547,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->pid = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
+
+    // TODO: CONFIRM WE HAVE THIS FREE SPACE
+    const uint ipSize = BE16(wire->iSize) + sizeof(wire_hash_t);
 
     // RE-ENCAPSULATE
     // SALVA ANTES DE SOBRESCREVER
@@ -628,7 +628,7 @@ static void xsock_setup (net_device_s* const dev) {
     dev->header_ops      = NULL;
     dev->type            = ARPHRD_NONE;
     dev->addr_len        = 0;
-    dev->hard_header_len = offsetof(xsock_wire_s, iVersionTOS); // ETH_HLEN
+    dev->hard_header_len = offsetof(xsock_wire_s, iVersionTOS);
     dev->min_header_len  = offsetof(xsock_wire_s, iVersionTOS);
     dev->min_mtu         = ETH_MAX_MTU;
     dev->max_mtu         = ETH_MAX_MTU;
