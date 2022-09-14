@@ -436,10 +436,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
-    // TODO: CONFIRM WE HAVE THIS FREE SPACE
     const uint ipSize = skb->len + sizeof(wire_hash_t);
-
-    //if (BE16(wire->iSize) != skb->len)
 
     if (PTR(wire) < SKB_HEAD(skb)
      || WIRE_IP(wire) + ipSize > SKB_END(skb)
