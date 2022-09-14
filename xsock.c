@@ -201,9 +201,9 @@ typedef struct xsock_path_s {
 
 // O BURST É RELATIVO A CONEXAO E É ESPECIFICO DA ATIVIDADE DO SERVICO
 #if XSOCK_SERVER
-#define CONN_BURST (HZ/4)
+#define CONN_BURST (HZ/5)
 #else
-#define CONN_BURST (HZ/4)
+#define CONN_BURST (HZ/5)
 #endif
 
 // EXPECTED SIZE
