@@ -469,15 +469,16 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
 
+    // FORCE USING ALL PATHS
+    //      -- TO ALLOW SERVER TO DISCOVER IT
+    //      -- BECAUSE ON STARTUP/END WE NEED A SUCCESSFULL RETRANSMISSION
+    // NOTE: ENQUANTO RETRANSMITIR O SYN/SYN-ACK/FIN/RST, VAI FICAR RESETANDO ISSO
     // TODO: FIXME: NO CLIENTE, SALVAR O ACK&SEQ DO SYN COMO BASE DO KEY
-    // FORCE PATH CHANGING
-    // NOTE: ENQUANTO RETRANSMITIR O SYN/SYN-ACK/FIN/RST, VAI FICAR RESETANDO O CDOWN A TODOS OS PATHS
     const uint cdown = wire->tFlags & (
             XSOCK_WIRE_TCP_SYN |
             XSOCK_WIRE_TCP_RST |
             XSOCK_WIRE_TCP_FIN
-        )
-        ? XSOCK_PATHS_N
+        ) ? XSOCK_PATHS_N
         : conn->cdown;
 
     // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
