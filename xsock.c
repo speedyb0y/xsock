@@ -174,8 +174,6 @@ typedef u32 wire_hash_t;
 // EXPECTED SIZE
 #define XSOCK_PATH_SIZE CACHE_LINE_SIZE
 
-// o oBurst é relativo a conexao enao tem q ue er uma macro global pois é especifico da atividade do servico
-//   -> diferenciar ela entre o servidor e o cliente
 typedef struct xsock_path_s {
     net_device_s* itfc;
     u32 oLast; // ULTIMA VEZ QUE ENVIOU - ENTAO DE LA ATE NOW PASSARAM-SE N DIFFIES
@@ -201,6 +199,7 @@ typedef struct xsock_path_s {
 #define O_PKTS_SHIFT 11
 #define O_PKTS_UNIT (1U << O_PKTS_SHIFT)
 
+// O BURST É RELATIVO A CONEXAO E É ESPECIFICO DA ATIVIDADE DO SERVICO
 #if XSOCK_SERVER
 #define CONN_BURST (HZ/4)
 #else
