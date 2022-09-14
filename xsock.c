@@ -433,9 +433,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (skb_linearize(skb))
         goto drop;
 
+    const uint ipSize = skb->len + sizeof(wire_hash_t);
+
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
     if (WIRE_ETH(wire) < SKB_HEAD(skb)
+      || (PTR(wire) + ipSize) > SKB_TAIL(skb)
       || wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
       || wire->iAddrs[0] != BE32(ADDR_SRV)
@@ -496,7 +499,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             // ACHOU UM PATH EXISTENTE E OK
 
             u64 oRemaining = path->oRemaining;
-            
+
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
             if (oRemaining < O_PKTS_UNIT) {
                 u64 oRemaining = now >= path->oLast
@@ -514,7 +517,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
             // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
             if ((oRemaining >= O_PKTS_UNIT || (c <= TRY_OK_EXCEEDS))
-#if XSOCK_SERVER        
+#if XSOCK_SERVER
             && (path->iActive >= now || (c <= TRY_OK_EXCEEDS_INACTIVES))
 #endif
             ) { // ACHOU UM PATH USAVEL
@@ -546,9 +549,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->pid = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
-
-    // TODO: CONFIRM WE HAVE THIS FREE SPACE
-    const uint ipSize = BE16(wire->iSize) + sizeof(wire_hash_t);
 
     // RE-ENCAPSULATE
     // SALVA ANTES DE SOBRESCREVER
