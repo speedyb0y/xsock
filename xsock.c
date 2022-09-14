@@ -507,7 +507,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
             if (oRemaining < O_PKTS_UNIT) {
-                u64 oRemaining = now >= path->oLast
+                oRemaining = now >= path->oLast
                         ? now - path->oLast
                         : path->oLast - now // OVERFLOWED - TODO: FIXME: FAZER A COISA CERTA
                     ;
