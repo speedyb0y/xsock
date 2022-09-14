@@ -437,8 +437,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
-    if (WIRE_ETH(wire) < SKB_HEAD(skb)
-      || (PTR(wire) + ipSize) > SKB_TAIL(skb)
+    if (WIRE_ETH(wire)          < SKB_HEAD(skb)
+      || WIRE_IP(wire) + ipSize > SKB_TAIL(skb)
       || wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
       || wire->iAddrs[0] != BE32(ADDR_SRV)
