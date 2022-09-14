@@ -627,11 +627,11 @@ static void xsock_setup (net_device_s* const dev) {
     dev->header_ops      = NULL;
     dev->type            = ARPHRD_NONE;
     dev->addr_len        = 0;
-    dev->hard_header_len = ETH_HLEN;
-    dev->min_header_len  = ETH_HLEN;
-    dev->min_mtu         = ETH_MIN_MTU;
+    dev->hard_header_len = offsetof(xsock_wire_s, iVersionTOS); // ETH_HLEN
+    dev->min_header_len  = offsetof(xsock_wire_s, iVersionTOS);
+    dev->min_mtu         = ETH_MAX_MTU;
     dev->max_mtu         = ETH_MAX_MTU;
-    dev->mtu             = ETH_MAX_MTU; // ETH_DATA_LEN
+    dev->mtu             = ETH_MAX_MTU;
     dev->tx_queue_len    = 0; // DEFAULT_TX_QUEUE_LEN
     dev->flags           = IFF_NOARP; // IFF_BROADCAST | IFF_MULTICAST
     dev->priv_flags      = IFF_NO_QUEUE
