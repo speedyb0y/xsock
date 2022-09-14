@@ -31,9 +31,10 @@ typedef struct net net_s;
 typedef struct header_ops header_ops_s;
 typedef struct net_device_ops net_device_ops_s;
 
-#define SKB_DATA(skb) PTR((skb)->data)
 #define SKB_HEAD(skb) PTR((skb)->head)
+#define SKB_DATA(skb) PTR((skb)->data)
 #define SKB_TAIL(skb) PTR(skb_tail_pointer(skb))
+#define SKB_END(skb) PTR(skb_end_pointer(skb))
 
 #define PTR(p) ((void*)(p))
 
@@ -438,7 +439,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
     if (WIRE_ETH(wire)          < SKB_HEAD(skb)
-      || WIRE_IP(wire) + ipSize > SKB_TAIL(skb)
+      || WIRE_IP(wire) + ipSize > SKB_END(skb)
       || wire->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
       || wire->iAddrs[0] != BE32(ADDR_SRV)
