@@ -521,7 +521,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             // ACHOU UM PATH EXISTENTE E OK
 
             u64 oRemaining = path->oRemaining;
-            
+
             // SE ESTE PATH JÁ ESTOUROU O LIMITE, TENTA RECONSTRUÍ-LO
             if (oRemaining < O_PKTS_UNIT) {
                 oRemaining = now >= path->oLast
@@ -539,7 +539,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
             // NA PENULTIMA TENTATIVA, LIBERA OS EXCEEDEDS
             // NA ULTIMA TENTATIVA, LIBERA OS INATIVOS
             if ((oRemaining >= O_PKTS_UNIT || c <= TRY_OK_EXCEEDS)
-#if XSOCK_SERVER        
+#if XSOCK_SERVER
             && (path->iActive >= now || c <= TRY_OK_EXCEEDS_INACTIVES)
 #endif
             ) { // ACHOU UM PATH USAVEL
