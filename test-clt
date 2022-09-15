@@ -19,9 +19,9 @@ ip -4 rule add priority 10 table ${XSOCK_TABLE} to ${XSOCK_PREFIX}.0/24
 ip -4 rule add priority 10 table ${XSOCK_TABLE} from ${XSOCK_PREFIX}.0/24
 ip -4 rule add priority 10 table ${XSOCK_TABLE} oif xsock
 
-ip -4 addr add dev xsock ${XSOCK_PREFIX}.$[1+${XSOCK_HOST}]
+ip -4 addr add dev xsock ${XSOCK_PREFIX}.${XSOCK_HOST}
 
 #rttvar TIME (Linux 2.3.15+ only)
 #ssthresh NUMBER (Linux 2.3.15+ only)
-ip -4 route add table ${XSOCK_TABLE} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src ${XSOCK_PREFIX}.$[1+${XSOCK_HOST}] ${XSOCK_PREFIX}.255 rtt 210ms rto_min 320ms
+ip -4 route add table ${XSOCK_TABLE} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src ${XSOCK_PREFIX}.${XSOCK_HOST} ${XSOCK_PREFIX}.255 rtt 210ms rto_min 320ms
 ip -4 route flush cache
