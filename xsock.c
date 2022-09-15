@@ -584,13 +584,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
 
-#if 1
-    if (wire->tFlags & XSOCK_WIRE_TCP_RST)
-        printk("HID %u CID %u RST @ PID %u\n", hid, cid, conn->pid);
-    if (wire->tFlags & XSOCK_WIRE_TCP_FIN)
-        printk("HID %u CID %u FIN @ PID %u\n", hid, cid, conn->pid);
-#endif
-
     // FORCE USING ALL PATHS
     //      -- TO ALLOW SERVER TO DISCOVER THEM
     //      -- TO ENFORCE A SUCCESSFULL RETRANSMISSION ON HANDSHAKE/FINALIZATION
