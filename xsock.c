@@ -299,11 +299,7 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, 
     b += swap64(b, size);
     c += swap64(a, size);
 
-    data += size;
-
     while (size >= sizeof(u64)) {
-        size -= sizeof(u64);
-        data -= sizeof(u64);
         const u64 orig = BE64(*(u64*)data);
         u64 value = orig;
         value = swap64(value, size);
@@ -314,11 +310,11 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, 
         a += swap64(orig, size);
         b += swap64(a, orig);
         c += swap64(b, orig);
+        data += sizeof(u64);
+        size -= sizeof(u64);
     }
 
     while (size) {
-        size -= sizeof(u8);
-        data -= sizeof(u8);
         const u8 orig = *(u8*)data;
         u64 value = orig;
         value += swap64(a, size);
@@ -328,6 +324,8 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, 
         *(u8*)data = value;
         a += swap64(b, orig);
         b += swap64(orig, a);
+        data += sizeof(u8);
+        size -= sizeof(u8);
     }
 
     a += b;
@@ -344,11 +342,7 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, u64 c, void* restrict data, u
     b += swap64(b, size);
     c += swap64(a, size);
 
-    data += size;
-
     while (size >= sizeof(u64)) {
-        size -= sizeof(u64);
-        data -= sizeof(u64);
         u64 orig = BE64(*(u64*)data);
         orig = unswap64(orig, c);
         orig = unswap64(orig, b);
@@ -358,11 +352,11 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, u64 c, void* restrict data, u
         a += swap64(orig, size);
         b += swap64(a, orig);
         c += swap64(b, orig);
+        data += sizeof(u64);
+        size -= sizeof(u64);
     }
 
     while (size) {
-        size -= sizeof(u8);
-        data -= sizeof(u8);
         u64 orig = *(u8*)data;
         orig -= swap64(c, size);
         orig -= swap64(b, size);
@@ -371,6 +365,8 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, u64 c, void* restrict data, u
         *(u8*)data = orig;
         a += swap64(b, orig);
         b += swap64(orig, a);
+        data += sizeof(u8);
+        size -= sizeof(u8);
     }
 
     a += b;
@@ -666,9 +662,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     *(u64*)wire->iAddrs      = *(u64*)path->iAddrs;
            wire->iCID        = BE16(cid);
            wire->iSize       = BE16(ipSize);
+           wire->iFrag       = 0;
            wire->iTTL        = 64;
            wire->iProtocol   = IPPROTO_UDP;
-           wire->iFrag       = 0;
            wire->iChecksum   = 0;
            wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
