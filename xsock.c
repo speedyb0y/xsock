@@ -395,7 +395,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
                  path->iAddrs[1] = wire->iAddrs[0];
                  path->iAddrs[0] = wire->iAddrs[1];
                  path->cport     = wire->ports[0];
-#if 0
+#if 1
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " 0x%04X%04X%04X 0x%08X %u ->"
             " 0x%04X%04X%04X 0x%08X %u\n",
