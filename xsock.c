@@ -293,11 +293,15 @@ static inline u64 unswap64 (u64 x, const u64 mask) {
     return x;
 }
 
+#define A 0xE04EC65E50E04E0EULL
+#define B 0x8A489FE74E0FE1E4ULL
+#define C 0x802E974870C48657ULL
+
 static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, uint size) {
 
-    a += swap64(c, size);
-    b += swap64(b, size);
-    c += swap64(a, size);
+    a += A + swap64(c, size);
+    b += B + swap64(b, size);
+    c += C + swap64(a, size);
 
     while (size >= sizeof(u64)) {
         const u64 orig = BE64(*(u64*)data);
@@ -338,9 +342,9 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, 
 
 static wire_hash_t xsock_in_decrypt (u64 a, u64 b, u64 c, void* restrict data, uint size) {
 
-    a += swap64(c, size);
-    b += swap64(b, size);
-    c += swap64(a, size);
+    a += A + swap64(c, size);
+    b += B + swap64(b, size);
+    c += C + swap64(a, size);
 
     while (size >= sizeof(u64)) {
         u64 orig = BE64(*(u64*)data);
@@ -446,8 +450,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // DECRYPT AND CONFIRM AUTHENTICITY
     if (xsock_in_decrypt(hid, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
-        != BE32(*wire_hash(wire, ipSize)))
+        != BE32(*wire_hash(wire, ipSize))) {
+        printk("BAD HASH\n");
         goto drop;
+    }
 
     // DETECT AND UPDATE PATH CHANGES AND AVAILABILITY
 #if XSOCK_SERVER
@@ -573,6 +579,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     xsock_conn_s* const conn = &host->conns[cid];
 
     const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
+
+#if 0
+    if (wire->tFlags & XSOCK_WIRE_TCP_RST)
+        printk("HID %u CID %u RST @ PID %u\n", hid, cid, conn->pid);
+    if (wire->tFlags & XSOCK_WIRE_TCP_FIN)
+        printk("HID %u CID %u FIN @ PID %u\n", hid, cid, conn->pid);
+#endif
 
     // FORCE USING ALL PATHS
     //      -- TO ALLOW SERVER TO DISCOVER THEM
