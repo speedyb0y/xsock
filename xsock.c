@@ -270,37 +270,115 @@ static const xsock_cfg_s cfg = {
     }
 };
 
-static wire_hash_t xsock_out_encrypt (u64 hid, u64 cid, void* data, uint size) {
+#define popcount32(x) __builtin_popcount((uint)(x))
+#define popcount64(x) __builtin_popcountll((uintll)(x))
 
-    u64 hash =
-        hid << 32 |
-        cid << 16 |
-        size
-        ;
+static inline u64 swap64 (u64 x, const u64 mask) {
+
+    const uint q = popcount64(mask);
+
+    x += mask;
+    x = (x >> q) | (x << (64 - q));
+
+    return x;
+}
+
+static inline u64 unswap64 (u64 x, const u64 mask) {
+
+    const uint q = popcount64(mask);
+
+    x = (x << q) | (x >> (64 - q));
+    x -= mask;
+
+    return x;
+}
+
+static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, uint size) {
+
+    a += swap64(c, size);
+    b += swap64(b, size);
+    c += swap64(a, size);
+
+    data += size;
 
     while (size >= sizeof(u64)) {
-        hash ^= size;
-        hash += *(u64*)data;
-        data += sizeof(u64);
         size -= sizeof(u64);
+        data -= sizeof(u64);
+        const u64 orig = BE64(*(u64*)data);
+        u64 value = orig;
+        value = swap64(value, size);
+        value = swap64(value, a);
+        value = swap64(value, b);
+        value = swap64(value, c);
+        *(u64*)data = BE64(value);
+        a += swap64(orig, size);
+        b += swap64(a, orig);
+        c += swap64(b, orig);
     }
 
     while (size) {
-        hash ^= size;
-        hash += *(u8*)data;
-        data += sizeof(u8);
         size -= sizeof(u8);
+        data -= sizeof(u8);
+        const u8 orig = *(u8*)data;
+        u64 value = orig;
+        value += swap64(a, size);
+        value += swap64(b, size);
+        value += swap64(c, size);
+        value &= 0xFFU;
+        *(u8*)data = value;
+        a += swap64(b, orig);
+        b += swap64(orig, a);
     }
 
-    hash += hash >> 32;
-    hash &= 0xFFFFFFFFULL;
+    a += b;
+    a += c;
+    a += a >> 32;
+    a &= 0xFFFFFFFFULL;
 
-    return hash;
+    return (wire_hash_t)a;
 }
 
-static wire_hash_t xsock_in_decrypt (u64 hid, u64 cid, void* data, uint size) {
+static wire_hash_t xsock_in_decrypt (u64 a, u64 b, u64 c, void* restrict data, uint size) {
 
-    return xsock_out_encrypt(hid, cid, data, size);
+    a += swap64(c, size);
+    b += swap64(b, size);
+    c += swap64(a, size);
+
+    data += size;
+
+    while (size >= sizeof(u64)) {
+        size -= sizeof(u64);
+        data -= sizeof(u64);
+        u64 orig = BE64(*(u64*)data);
+        orig = unswap64(orig, c);
+        orig = unswap64(orig, b);
+        orig = unswap64(orig, a);
+        orig = unswap64(orig, size);
+        *(u64*)data = BE64(orig);
+        a += swap64(orig, size);
+        b += swap64(a, orig);
+        c += swap64(b, orig);
+    }
+
+    while (size) {
+        size -= sizeof(u8);
+        data -= sizeof(u8);
+        u64 orig = *(u8*)data;
+        orig -= swap64(c, size);
+        orig -= swap64(b, size);
+        orig -= swap64(a, size);
+        orig &= 0xFFU;
+        *(u8*)data = orig;
+        a += swap64(b, orig);
+        b += swap64(orig, a);
+    }
+
+    a += b;
+    a += c;
+    a += a >> 32;
+    a &= 0xFFFFFFFFULL;
+
+    return (wire_hash_t)a;
 }
 
 // TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
@@ -366,7 +444,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
+    if (xsock_in_decrypt(hid, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
         != BE32(*wire_hash(wire, ipSize)))
         goto drop;
 
@@ -594,9 +672,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
 #if XSOCK_SERVER
-        = BE32(xsock_out_encrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
+        = BE32(xsock_out_encrypt(hid, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
 #else
-        = BE32(xsock_out_encrypt(XSOCK_HOST_ID, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
+        = BE32(xsock_out_encrypt(XSOCK_HOST_ID, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
 #endif
 
     skb->data             = WIRE_ETH(wire);
