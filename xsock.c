@@ -436,6 +436,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (pid >= XSOCK_PATHS_N)
         goto drop;
 
+    if (wire->iFrag) {
+        printk("FRAG 0x%04X\n", wire->iFrag);
+        goto drop;
+    }
+
     // GET THE SIZE OF THE ORIGINAL PACKET
     const uint ipSize = BE16(wire->iSize) - sizeof(wire_hash_t);
 
@@ -663,6 +668,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->iSize       = BE16(ipSize);
            wire->iTTL        = 64;
            wire->iProtocol   = IPPROTO_UDP;
+           wire->iFrag       = 0;
            wire->iChecksum   = 0;
            wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
