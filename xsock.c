@@ -540,6 +540,10 @@ drop:
 #define TRY_OK_EXCEEDS           (1*XSOCK_PATHS_N)
 #endif
 
+#if !XSOCK_SERVER
+#define hid XSOCK_HOST_ID
+#endif
+
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     if (skb_linearize(skb))
@@ -685,11 +689,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
-#if XSOCK_SERVER
         = BE32(xsock_out_encrypt(hid, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
-#else
-        = BE32(xsock_out_encrypt(XSOCK_HOST_ID, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
-#endif
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
