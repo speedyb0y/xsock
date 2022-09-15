@@ -16,39 +16,39 @@
 //#define  GW1 "\xcc\xed\x21\x96\x99\xc0"
 //#define  GW2 "\x90\x55\xde\xa1\xcd\xf0"
 
-#define XCONF_XSOCK_HOST_ID 1
-#define IP_0_C 0
-#define IP_0_D 20
-#define IP_1_C 100
-#define IP_1_D 20
-#define IP_2_C 1
-#define IP_2_D 20
-#define ITFC0 "eth0"
-#define ITFC1 "eth0"
-#define ITFC2 "eth0"
-#define MAC0 "\xd0\x50\x99\xae\xde\x92"
-#define MAC1 "\xd0\x50\x99\xae\xde\x92"
-#define MAC2 "\xd0\x50\x99\xae\xde\x92"
-#define  GW0 "\x54\x9f\x06\xf4\xc7\xa0"
-#define  GW1 "\xcc\xed\x21\x96\x99\xc0"
-#define  GW2 "\x90\x55\xde\xa1\xcd\xf0"
-
-//#define XCONF_XSOCK_HOST_ID 3
+//#define XCONF_XSOCK_HOST_ID 1
+//#define IP_0_C 0
+//#define IP_0_D 20
+//#define IP_1_C 100
+//#define IP_1_D 20
+//#define IP_2_C 1
+//#define IP_2_D 20
 //#define ITFC0 "eth0"
 //#define ITFC1 "eth0"
 //#define ITFC2 "eth0"
-//#define IP_0_C 1
-//#define IP_0_D 177
-//#define IP_1_C 1
-//#define IP_1_D 177
-//#define IP_2_C 1
-//#define IP_2_D 177
-//#define MAC0 "\x70\x5a\x0f\x68\x14\x30"
-//#define MAC1 "\x70\x5a\x0f\x68\x14\x30"
-//#define MAC2 "\x70\x5a\x0f\x68\x14\x30"
-//#define  GW0 "\x90\x75\xbc\x34\x19\x70"
-//#define  GW1 "\x90\x75\xbc\x34\x19\x70"
-//#define  GW2 "\x90\x75\xbc\x34\x19\x70"
+//#define MAC0 "\xd0\x50\x99\xae\xde\x92"
+//#define MAC1 "\xd0\x50\x99\xae\xde\x92"
+//#define MAC2 "\xd0\x50\x99\xae\xde\x92"
+//#define  GW0 "\x54\x9f\x06\xf4\xc7\xa0"
+//#define  GW1 "\xcc\xed\x21\x96\x99\xc0"
+//#define  GW2 "\x90\x55\xde\xa1\xcd\xf0"
+
+#define XCONF_XSOCK_HOST_ID 3
+#define ITFC0 "eth0"
+#define ITFC1 "eth0"
+#define ITFC2 "eth0"
+#define IP_0_C 1
+#define IP_0_D 177
+#define IP_1_C 1
+#define IP_1_D 177
+#define IP_2_C 1
+#define IP_2_D 177
+#define MAC0 "\x70\x5a\x0f\x68\x14\x30"
+#define MAC1 "\x70\x5a\x0f\x68\x14\x30"
+#define MAC2 "\x70\x5a\x0f\x68\x14\x30"
+#define  GW0 "\x90\x75\xbc\x34\x19\x70"
+#define  GW1 "\x90\x75\xbc\x34\x19\x70"
+#define  GW2 "\x90\x75\xbc\x34\x19\x70"
 
 // -------
 

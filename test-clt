@@ -1,25 +1,27 @@
 #!/bin/bash
 
-XSOCK_HOST=1
-TABLE_XSOCK=5
+XSOCK_PREFIX=192.0.0
+XSOCK_HOST=3
+XSOCK_TABLE=5
 
 (make && insmod xsock-clt.ko)
 
 echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
-echo 4096 > /proc/sys/net/ipv4/tcp_max_reordering
-echo 300 > /proc/sys/net/ipv4/tcp_reordering
-echo 1 > /proc/sys/net/ipv4/tcp_fwmark_accept
+echo 8000 > /proc/sys/net/ipv4/tcp_max_reordering
+echo 1000 > /proc/sys/net/ipv4/tcp_reordering
 echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
 
 ip link set dev xsock up
 
 ISP_MTU=1492
 
-ip -4 rule add priority 10 table ${TABLE_XSOCK} to 192.0.0.0/24
-ip -4 rule add priority 10 table ${TABLE_XSOCK} from 192.0.0.0/24
-ip -4 rule add priority 10 table ${TABLE_XSOCK} oif xsock
-ip -4 addr add dev xsock 192.0.0.${XSOCK_HOST}
+ip -4 rule add priority 10 table ${XSOCK_TABLE} to ${XSOCK_PREFIX}.0/24
+ip -4 rule add priority 10 table ${XSOCK_TABLE} from ${XSOCK_PREFIX}.0/24
+ip -4 rule add priority 10 table ${XSOCK_TABLE} oif xsock
+
+ip -4 addr add dev xsock ${XSOCK_PREFIX}.$[1+${XSOCK_HOST}]
+
 #rttvar TIME (Linux 2.3.15+ only)
 #ssthresh NUMBER (Linux 2.3.15+ only)
-ip -4 route add table ${TABLE_XSOCK} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src 192.0.0.${XSOCK_HOST} 192.0.0.255 rtt 210ms rto_min 320ms
+ip -4 route add table ${XSOCK_TABLE} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4-40] src ${XSOCK_PREFIX}.$[1+${XSOCK_HOST}] ${XSOCK_PREFIX}.255 rtt 210ms rto_min 320ms
 ip -4 route flush cache

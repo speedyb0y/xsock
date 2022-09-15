@@ -670,14 +670,15 @@ static void xsock_setup (net_device_s* const dev) {
 
 static int __init xsock_init (void) {
 
+    BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
+    BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
+
 #if XSOCK_SERVER
     printk("XSOCK: SERVER INIT\n");
 #else
     printk("XSOCK: CLIENT INIT\n");
 #endif
-    BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
-    BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
-    BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
 
     // CREATE THE VIRTUAL INTERFACE
     net_device_s* const dev = alloc_netdev(0, "xsock", NET_NAME_USER, xsock_setup);
