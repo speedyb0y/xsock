@@ -524,6 +524,15 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
+#if XSOCK_SERVER
+#define TRY_OK                   (3*XSOCK_PATHS_N)
+#define TRY_OK_EXCEEDS           (2*XSOCK_PATHS_N)
+#define TRY_OK_EXCEEDS_INACTIVES (1*XSOCK_PATHS_N)
+#else
+#define TRY_OK                   (2*XSOCK_PATHS_N)
+#define TRY_OK_EXCEEDS           (1*XSOCK_PATHS_N)
+#endif
+
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     if (skb_linearize(skb))
@@ -565,10 +574,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
 
     // FORCE USING ALL PATHS
-    //      -- TO ALLOW SERVER TO DISCOVER IT
-    //      -- BECAUSE ON STARTUP/END WE NEED A SUCCESSFULL RETRANSMISSION
+    //      -- TO ALLOW SERVER TO DISCOVER THEM
+    //      -- TO ENFORCE A SUCCESSFULL RETRANSMISSION ON HANDSHAKE/FINALIZATION
     // NOTE: ENQUANTO RETRANSMITIR O SYN/SYN-ACK/FIN/RST, VAI FICAR RESETANDO ISSO
-    // TODO: FIXME: NO CLIENTE, SALVAR O ACK&SEQ DO SYN COMO BASE DO KEY
     const uint cdown = wire->tFlags & (
             XSOCK_WIRE_TCP_SYN |
             XSOCK_WIRE_TCP_RST |
@@ -578,15 +586,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
     uint pid = (uint)conn->pid + (cdown || conn->burst < now);
-
-#if XSOCK_SERVER
-#define TRY_OK                   (3*XSOCK_PATHS_N)
-#define TRY_OK_EXCEEDS           (2*XSOCK_PATHS_N)
-#define TRY_OK_EXCEEDS_INACTIVES (1*XSOCK_PATHS_N)
-#else
-#define TRY_OK                   (2*XSOCK_PATHS_N)
-#define TRY_OK_EXCEEDS           (1*XSOCK_PATHS_N)
-#endif
 
     uint c = TRY_OK;
 
