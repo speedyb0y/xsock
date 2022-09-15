@@ -270,20 +270,37 @@ static const xsock_cfg_s cfg = {
     }
 };
 
-static wire_hash_t xsock_out_encrypt (void* data, uint size) {
+static wire_hash_t xsock_out_encrypt (u64 hid, u64 cid, void* data, uint size) {
 
-    (void)data;
-    (void)size;
+    u64 hash =
+        hid << 32 |
+        cid << 16 |
+        size
+        ;
 
-    return size;
+    while (size >= sizeof(u64)) {
+        hash ^= size;
+        hash += *(u64*)data;
+        data += sizeof(u64);
+        size -= sizeof(u64);
+    }
+
+    while (size) {
+        hash ^= size;
+        hash += *(u8*)data;
+        data += sizeof(u8);
+        size -= sizeof(u8);
+    }
+
+    hash += hash >> 32;
+    hash &= 0xFFFFFFFFULL;
+
+    return hash;
 }
 
-static wire_hash_t xsock_in_decrypt (void* data, uint size) {
+static wire_hash_t xsock_in_decrypt (u64 hid, u64 cid, void* data, uint size) {
 
-    (void)data;
-    (void)size;
-
-    return size;
+    return xsock_out_encrypt(hid, cid, data, size);
 }
 
 // TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
@@ -349,7 +366,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(WIRE_UDP_PAYLOAD(wire), ipSize - 28)
+    if (xsock_in_decrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
         != BE32(*wire_hash(wire, ipSize)))
         goto drop;
 
@@ -576,7 +593,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     //
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
-        = BE32(xsock_out_encrypt(WIRE_UDP_PAYLOAD(wire), ipSize - 32));
+#if XSOCK_SERVER
+        = BE32(xsock_out_encrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
+#else
+        = BE32(xsock_out_encrypt(XSOCK_HOST_ID, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
+#endif
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
