@@ -209,10 +209,12 @@ typedef struct xsock_path_s {
 // EXPECTED SIZE
 #define XSOCK_CONN_SIZE 8
 
+#define XSOCK_CONN_BURST_MASK 0x3ffffffffffffffULL
+
 typedef struct xsock_conn_s {
-    u64 burst:59,
+    u64 burst:58,
         cdown:3,
-        pid:2;
+        pid:3;
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
@@ -622,7 +624,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_conn_s* const conn = &host->conns[cid];
 
-    const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
+    const uint now = ((u64)jiffies) & XSOCK_CONN_BURST_MASK;
 
     // FORCE USING ALL PATHS
     //      -- TO ALLOW SERVER TO DISCOVER THEM
