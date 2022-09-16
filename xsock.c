@@ -615,7 +615,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 
-    xsock_orig_s* const orig = SKB_DATA(skb);
+    const xsock_orig_s* const orig = SKB_DATA(skb);
 
     uint ipSize = skb->len;
 
