@@ -398,6 +398,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
     if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
 || WIRE_ETH(wire)                 < SKB_HEAD(skb)
+         || wire->iFrag
          || wire->eType != BE16(ETH_P_IP)
          || wire->iProtocol != IPPROTO_UDP)
         return RX_HANDLER_PASS;
@@ -435,11 +436,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // VALIDATE PATH ID
     if (pid >= XSOCK_PATHS_N)
         goto drop;
-
-    if (wire->iFrag) {
-        printk("FRAG 0x%04X\n", wire->iFrag);
-        goto drop;
-    }
 
     // GET THE SIZE OF THE ORIGINAL PACKET
     const uint ipSize = BE16(wire->iSize) - sizeof(wire_hash_t);
