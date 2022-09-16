@@ -648,12 +648,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const uint cid = BE16(orig->tSrc);
 #endif
 
+    if (hid
 #if XSOCK_SERVER
-    if (hid >= XSOCK_HOSTS_N)
+        >= XSOCK_HOSTS_N
 #else
-    if (hid != XSOCK_HOST_ID)
+        != XSOCK_HOST_ID
 #endif
-    {
+    ) {
         printk("OUT: DROP: BAD HID\n");
         goto drop;
     }
