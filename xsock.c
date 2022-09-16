@@ -692,7 +692,7 @@ wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
 
-    spin_unlock_irqrestore(&host->lock);
+    spin_unlock_irq(&host->lock);
 
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
@@ -702,7 +702,7 @@ wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
     return NETDEV_TX_OK;
 
 drop_unlock:
-    spin_unlock_irqrestore(&host->lock);
+    spin_unlock_irq(&host->lock);
 
 drop:
     printk("OUT: DROP\n");
