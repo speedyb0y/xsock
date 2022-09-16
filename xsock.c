@@ -469,7 +469,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     write_lock_irqsave(&host->lock, irqStatus);
 
-                 path->iActive = jiffies + path->iTimeout*HZ;
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
                  path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
@@ -490,8 +489,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
             _MAC(path->eSrc), _IP4(path->iAddrs[0]), BE16(wire->ports[1]),
             _MAC(path->eDst), _IP4(path->iAddrs[1]), BE16(path->cport));
 #endif
-        write_unlock_irqrestore(&host->lock, irqStatus);
     }
+
+    path->iActive = jiffies + path->iTimeout*HZ;
+
+    write_unlock_irqrestore(&host->lock, irqStatus);
 #endif
 
     // RE-ENCAPSULATE
