@@ -128,8 +128,6 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_TCP_FLAGS_FIN 0b0000000100000000U
 #endif
 
-#define ORIG_IP(orig) PTR(&(orig)->iVersion)
-
 #define WIRE_ETH(wire)     PTR(&(wire)->eDst)
 #define WIRE_IP(wire)      PTR(&(wire)->iVersion)
 #define WIRE_UDP(wire)     PTR(&(wire)->uSrc)
@@ -620,20 +618,21 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 
-    uint ipSize = skb->len;
+    // THE ENCAPSULED IP SIZE
+    uint ipSize = skb->len + sizeof(wire->xHash);
 
-    if (ipSize < sizeof(xsock_orig_s)) {
+    if (ipSize < (sizeof(xsock_wire_s) - offsetof(xsock_wire_s, iVersion))) {
         printk("OUT: DROP: TOO SMALL\n");
+        goto drop;
+    }
+
+    if (WIRE_IP(wire) + ipSize > SKB_END(skb)) {
+        printk("OUT: DROP: INCOMPLETE\n");
         goto drop;
     }
 
     // AMBOS TEM O MESMO TAMANHO, ENTAO COMECAM NO MESMO LUGAR
     const xsock_orig_s* const orig = PTR(wire);
-
-    if (ORIG_IP(orig) + ipSize > SKB_END(skb)) {
-        printk("OUT: DROP: INCOMPLETE\n");
-        goto drop;
-    }
 
     // DON'T ALLOW INTERFERENCE FROM IP OPTIONS, IPV6, ICMP, WRONG ADDRESSES/PORTS
     if (orig->iVersion != 0x45
@@ -768,9 +767,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     net_device_s* const itfc = path->itfc;
 
     spin_unlock_irq(&host->lock);
-
-    // NOW THE ENCAPSULED IP SIZE
-    ipSize += sizeof(wire->xHash);
 
     // FINISH AND ENCODE
  // wire->iVersion
