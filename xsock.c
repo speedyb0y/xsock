@@ -467,16 +467,22 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint cid = BE16(wire->iCID);
 
     // VALIDATE HOST ID
+    if (hid
 #if XSOCK_SERVER
-    if (hid >= XSOCK_HOSTS_N)
+        >= XSOCK_HOSTS_N
 #else
-    if (hid != XSOCK_HOST_ID)
+        != XSOCK_HOST_ID
 #endif
+    ) {
+        printk("IN: DROP: BAD HID\n");
         goto drop;
+    }
 
     // VALIDATE PATH ID
-    if (pid >= XSOCK_PATHS_N)
+    if (pid >= XSOCK_PATHS_N) {
+        printk("IN: DROP: BAD PID\n");
         goto drop;
+    }
 
     // GET THE SIZE OF THE ENCAPSULATED PACKET
     uint ipSize = BE16(wire->iSize);
