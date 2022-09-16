@@ -549,7 +549,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     orig->iVersion  = 0x45;
     orig->iTOS      = 0;
     orig->iSize     = BE16(origSize);
-    orig->iCID      = 0;
+    orig->iID       = 0;
     orig->iFrag     = 0;
     orig->iTTL      = 64;
     orig->iProtocol = IPPROTO_TCP;
