@@ -297,13 +297,11 @@ static inline u64 unswap64 (u64 x, const u64 mask) {
 
 #define A 0xE04EC65E50E04E0EULL
 #define B 0x8A489FE74E0FE1E4ULL
-#define C 0x802E974870C48657ULL
 
-static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, uint size) {
+static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint size) {
 
-    a += A + swap64(c, size);
-    b += B + swap64(b, size);
-    c += C + swap64(a, size);
+    a += A + swap64(b, size);
+    b += B + swap64(a, size);
 
     while (size >= sizeof(u64)) {
         const u64 orig = BE64(*(u64*)data);
@@ -311,11 +309,9 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, 
         value = swap64(value, size);
         value = swap64(value, a);
         value = swap64(value, b);
-        value = swap64(value, c);
         *(u64*)data = BE64(value);
         a += swap64(orig, size);
         b += swap64(a, orig);
-        c += swap64(b, orig);
         data += sizeof(u64);
         size -= sizeof(u64);
     }
@@ -325,7 +321,6 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, 
         u64 value = orig;
         value += swap64(a, size);
         value += swap64(b, size);
-        value += swap64(c, size);
         value &= 0xFFU;
         *(u8*)data = value;
         a += swap64(b, orig);
@@ -335,36 +330,31 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, u64 c, void* restrict data, 
     }
 
     a += b;
-    a += c;
     a += a >> 32;
     a &= 0xFFFFFFFFULL;
 
     return (wire_hash_t)a;
 }
 
-static wire_hash_t xsock_in_decrypt (u64 a, u64 b, u64 c, void* restrict data, uint size) {
+static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
 
-    a += A + swap64(c, size);
-    b += B + swap64(b, size);
-    c += C + swap64(a, size);
+    a += A + swap64(b, size);
+    b += B + swap64(a, size);
 
     while (size >= sizeof(u64)) {
         u64 orig = BE64(*(u64*)data);
-        orig = unswap64(orig, c);
         orig = unswap64(orig, b);
         orig = unswap64(orig, a);
         orig = unswap64(orig, size);
         *(u64*)data = BE64(orig);
         a += swap64(orig, size);
         b += swap64(a, orig);
-        c += swap64(b, orig);
         data += sizeof(u64);
         size -= sizeof(u64);
     }
 
     while (size) {
         u64 orig = *(u8*)data;
-        orig -= swap64(c, size);
         orig -= swap64(b, size);
         orig -= swap64(a, size);
         orig &= 0xFFU;
@@ -376,7 +366,6 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, u64 c, void* restrict data, u
     }
 
     a += b;
-    a += c;
     a += a >> 32;
     a &= 0xFFFFFFFFULL;
 
@@ -447,7 +436,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(hid, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
+    if (xsock_in_decrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
         != BE32(*wire_hash(wire, ipSize))) {
         printk("BAD HASH\n");
         goto drop;
@@ -581,6 +570,21 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     xsock_host_s* const host = &hosts[hid];
 #endif
 
+    // SALVA ANTES DE SOBRESCREVER
+    wire->tSeq2       = wire->tSeq;
+    wire->uSize       = BE16(ipSize - 20);
+    wire->uChecksum   = 0;
+    wire->iCID        = BE16(cid);
+    wire->iSize       = BE16(ipSize);
+    wire->iFrag       = 0;
+    wire->iTTL        = 64;
+    wire->iProtocol   = IPPROTO_UDP;
+    wire->iChecksum   = 0;
+
+    // ENCODE ANTES DO SPINLOCK
+    *wire_hash(wire, ipSize - sizeof(wire_hash_t))
+        = BE32(xsock_out_encrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
+
     unsigned long irqStatus;
 
     spin_lock_irqsave(&host->lock, irqStatus);
@@ -669,10 +673,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->burst = now + CONN_BURST;
 
     // RE-ENCAPSULATE
-    // SALVA ANTES DE SOBRESCREVER
-           wire->tSeq2       = wire->tSeq;
-           wire->uSize       = BE16(ipSize - 20);
-           wire->uChecksum   = 0;
 #if XSOCK_SERVER
            wire->ports[0]    = BE16(PORT(hid, pid));
            wire->ports[1]    = path->cport; // THE CLIENT IS BEHIND NAT
@@ -681,19 +681,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
            wire->ports[1]    = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
     *(u64*)wire->iAddrs      = *(u64*)path->iAddrs;
-           wire->iCID        = BE16(cid);
-           wire->iSize       = BE16(ipSize);
-           wire->iFrag       = 0;
-           wire->iTTL        = 64;
-           wire->iProtocol   = IPPROTO_UDP;
-           wire->iChecksum   = 0;
            wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
-
-    //
-    *wire_hash(wire, ipSize - sizeof(wire_hash_t))
-        = BE32(xsock_out_encrypt(hid, pid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
