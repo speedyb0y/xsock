@@ -340,45 +340,46 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
     return (wire_hash_t)a;
 }
 
-static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
+#define xsock_in_decrypt xsock_out_encrypt
+//static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
 
-    a += A + swap64(b, size);
-    b += B + swap64(a, size);
+    //a += A + swap64(b, size);
+    //b += B + swap64(a, size);
 
-#if 1
-    while (size >= sizeof(u64)) {
-        u64 orig = BE64(*(u64*)data);
-        orig = unswap64(orig, b);
-        orig = unswap64(orig, a);
-        orig = unswap64(orig, size);
-        //*(u64*)data = BE64(orig);
-        a += swap64(orig, size);
-        b += swap64(a, orig);
-        data += sizeof(u64);
-        size -= sizeof(u64);
-    }
-#endif
+//#if 1
+    //while (size >= sizeof(u64)) {
+        //u64 orig = BE64(*(u64*)data);
+        //orig = unswap64(orig, b);
+        //orig = unswap64(orig, a);
+        //orig = unswap64(orig, size);
+        ////*(u64*)data = BE64(orig);
+        //a += swap64(orig, size);
+        //b += swap64(a, orig);
+        //data += sizeof(u64);
+        //size -= sizeof(u64);
+    //}
+//#endif
 
-#if 1
-    while (size) {
-        u64 orig = *(u8*)data;
-        orig -= swap64(b, size);
-        orig -= swap64(a, size);
-        orig &= 0xFFU;
-        //*(u8*)data = orig;
-        a += swap64(b, orig);
-        b += swap64(orig, a);
-        data += sizeof(u8);
-        size -= sizeof(u8);
-    }
-#endif
+//#if 1
+    //while (size) {
+        //u64 orig = *(u8*)data;
+        //orig -= swap64(b, size);
+        //orig -= swap64(a, size);
+        //orig &= 0xFFU;
+        ////*(u8*)data = orig;
+        //a += swap64(b, orig);
+        //b += swap64(orig, a);
+        //data += sizeof(u8);
+        //size -= sizeof(u8);
+    //}
+//#endif
 
-    a += b;
-    a += a >> 32;
-    a &= 0xFFFFFFFFULL;
+    //a += b;
+    //a += a >> 32;
+    //a &= 0xFFFFFFFFULL;
 
-    return (wire_hash_t)a;
-}
+    //return (wire_hash_t)a;
+//}
 
 // TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
 static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
