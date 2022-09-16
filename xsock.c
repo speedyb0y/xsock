@@ -701,6 +701,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     return NETDEV_TX_OK;
 
 drop:
+    printk("OUT: DROP\n");
+
     dev_kfree_skb(skb);
 
     return NETDEV_TX_OK;
