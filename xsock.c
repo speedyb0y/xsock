@@ -626,7 +626,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // ENCODE ANTES DO SPINLOCK
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
-        = BE32(xsock_out_encrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 20 - 8 - 4));
+        = BE32(xsock_out_encrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 20 - 8 - sizeof(wire_hash_t)));
 
     spin_lock_irq(&host->lock);
 
