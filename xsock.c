@@ -673,9 +673,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #endif
     xsock_conn_s* const conn = &host->conns[cid];
 
-    spin_lock_irq(&host->lock);
-
     const u64 now = ((u64)jiffies) & XSOCK_CONN_BURST_MASK;
+
+    spin_lock_irq(&host->lock);
 
     // FORCE USING ALL PATHS
     //      -- TO ALLOW SERVER TO DISCOVER THEM
