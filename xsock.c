@@ -446,7 +446,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // DECRYPT AND CONFIRM AUTHENTICITY
     if (xsock_in_decrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
         != BE32(*wire_hash(wire, ipSize))) {
-        printk("BAD HASH\n");
+        printk("IN: DROP: BAD HASH\n");
         goto drop;
     }
 
