@@ -412,18 +412,18 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
 
     // CONFIRM PACKET SIZE
-    // CONFIRM THIS IS ETHERNET/IPV4/UDP
+    // CONFIRM THIS IS IPV4
+    // CONFIRM THIS IS UDP
     // CONFIRM IT HAS NO IP OPTIONS
     // CONFIRM IT'S NOT FRAGMENTED - TODO: FIXME: IGNORE THE DON'T FRAGMENT FLAG
     if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
 || WIRE_ETH(wire)                 < SKB_HEAD(skb)
          || wire->iVersion != 0x45
-         || wire->iProtocol != IPPROTO_UDP
          || wire->iFrag
+         || wire->iProtocol != IPPROTO_UDP
 #if !XSOCK_SERVER // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
          || wire->uDst != BE16(XSOCK_PORT)
 #endif
-        return RX_HANDLER_PASS;
     )
         return RX_HANDLER_PASS;
 
