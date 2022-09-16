@@ -787,7 +787,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     spin_unlock_irq(&host->lock);
 
     // ENCODE
-    wire->uSize       = BE16(ipSize - sizeof(iphdr));
+    wire->uSize       = BE16(ipSize - sizeof(struct iphdr));
     wire->uChecksum   = 0;
     wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
     wire->tSeq        = wire->xHash;
