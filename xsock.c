@@ -617,14 +617,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_orig_s* const orig = SKB_DATA(skb);
 
-    const uint origSize = skb->len;
+    uint ipSize = skb->len;
 
-    if (origSize < sizeof(xsock_orig_s)) {
+    if (ipSize < sizeof(xsock_orig_s)) {
         printk("OUT: DROP: TOO SMALL\n");
         goto drop;
     }
 
-    if (PTR(orig) + origSize > SKB_END(skb)) {
+    if (PTR(orig) + ipSize > SKB_END(skb)) {
         printk("OUT: DROP: INCOMPLETE\n");
         goto drop;
     }
@@ -757,8 +757,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop_unlock;
     }
 
-    //
-    const uint ipSize = origSize + sizeof(wire->xHash);
+    // NOW THE ENCAPSULED IP SIZE
+    ipSize += sizeof(wire->xHash);
 
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
@@ -795,17 +795,20 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         WIRE_PAYLOAD_SIZE(ipSize)
         ));
 
+    //
+    ipSize += ETH_HLEN;
+
     skb->transport_header = WIRE_UDP(wire) - SKB_HEAD(skb);
     skb->network_header   = WIRE_IP (wire) - SKB_HEAD(skb);
     skb->mac_header       = WIRE_ETH(wire) - SKB_HEAD(skb);
     skb->data             = WIRE_ETH(wire);
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
-    skb->tail             = WIRE_ETH(wire) - SKB_HEAD(skb) + ETH_HLEN + ipSize;
+    skb->tail             = WIRE_ETH(wire) - SKB_HEAD(skb) + ipSize;
 #else
-    skb->tail             = WIRE_ETH(wire) + ETH_HLEN + ipSize;
+    skb->tail             = WIRE_ETH(wire) + ipSize;
 #endif
     skb->mac_len          = ETH_HLEN;
-    skb->len              = ETH_HLEN + ipSize;
+    skb->len              = ipSize;
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = itfc;
 
