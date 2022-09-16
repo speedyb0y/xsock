@@ -854,6 +854,7 @@ static int __init xsock_init (void) {
 
     BUILD_BUG_ON(sizeof(xsock_orig_s) != XSOCK_ORIG_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
+    BUILD_BUG_ON(sizeof(xsock_wire_hash_t) != sizeof(((xsock_wire_s*)0ULL)->xHash));
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
 
