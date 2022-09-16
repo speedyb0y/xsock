@@ -183,7 +183,7 @@ typedef struct xsock_orig_s {
     u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u32 tSeq2;
+    u32 tSeq2; // CHECKSUM, URGENT
 } xsock_orig_s;
 
 // EXPECTED SIZE
@@ -457,6 +457,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // GET THE SIZE OF THE ENCAPSULATED PACKET
     const uint ipSize = BE16(wire->iSize);
 
+    if (ipSize < sizeof(xsock_orig_s)) {
+        printk("IN: DROP: SMALL\n");
+		goto drop;
+	}
+	
     // DROP INCOMPLETE PACKETS
     if ((WIRE_IP(wire) + ipSize) > SKB_TAIL(skb)) {
         printk("IN: DROP: INCOMPLETE\n");
