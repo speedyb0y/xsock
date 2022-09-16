@@ -670,14 +670,16 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // RE-ENCAPSULATE
 #if XSOCK_SERVER
-           wire->ports[0]    = BE16(PORT(hid, pid));
-           wire->ports[1]    = path->cport; // THE CLIENT IS BEHIND NAT
+    wire->ports[0]    = BE16(PORT(hid, pid));
+    wire->ports[1]    = path->cport; // THE CLIENT IS BEHIND NAT
 #else
-           wire->ports[0]    = BE16(XSOCK_PORT);
-           wire->ports[1]    = BE16(PORT(XSOCK_HOST_ID, pid));
+    wire->ports[0]    = BE16(XSOCK_PORT);
+    wire->ports[1]    = BE16(PORT(XSOCK_HOST_ID, pid));
 #endif
-    *(u64*)wire->iAddrs      = *(u64*)path->iAddrs;
-           wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
+    *(u64*)wire->iAddrs  =
+    *(u64*)path->iAddrs;
+    
+wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
@@ -700,7 +702,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     return NETDEV_TX_OK;
 
 drop_unlock:
-
     spin_unlock_irqrestore(&host->lock);
 
 drop:
