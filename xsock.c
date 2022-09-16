@@ -568,6 +568,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
 
     xsock_host_s* const host = &hosts[hid];
+
+    const uint cid = BE16(wire->ports[1]);
+#else
+    const uint cid = BE16(wire->ports[0]);
 #endif
 
     // SALVA ANTES DE SOBRESCREVER
@@ -589,11 +593,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     spin_lock_irqsave(&host->lock, irqStatus);
 
-#if XSOCK_SERVER
-    const uint cid = BE16(wire->ports[1]);
-#else
-    const uint cid = BE16(wire->ports[0]);
-#endif
+
 
     xsock_conn_s* const conn = &host->conns[cid];
 
