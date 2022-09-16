@@ -330,8 +330,8 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
     }
 
     a += b;
-    a += a >> 32;
-    a &= 0xFFFFFFFFULL;
+    //a += a >> 32;
+    //a &= 0xFFFFFFFFULL;
 
     return (wire_hash_t)a;
 }
@@ -366,8 +366,8 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint siz
     }
 
     a += b;
-    a += a >> 32;
-    a &= 0xFFFFFFFFULL;
+    //a += a >> 32;
+    //a &= 0xFFFFFFFFULL;
 
     return (wire_hash_t)a;
 }
