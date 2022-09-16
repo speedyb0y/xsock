@@ -649,11 +649,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #endif
 
 #if XSOCK_SERVER
-    if (hid >= XSOCK_HOSTS_N) {
+    if (hid >= XSOCK_HOSTS_N)
+#else
+    if (hid >= XSOCK_HOST_ID)
+#endif
+    {
         printk("OUT: DROP: BAD HID\n");
         goto drop;
     }
-#endif
 
 #if XSOCK_SERVER
     xsock_host_s* const host = &hosts[hid];
