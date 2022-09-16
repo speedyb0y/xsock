@@ -129,7 +129,7 @@ typedef struct net_device_ops net_device_ops_s;
 #define WIRE_ETH(wire)         PTR(&(wire)->eDst)
 #define WIRE_IP(wire)          PTR(&(wire)->iVersionTOS)
 #define WIRE_UDP(wire)         PTR(&(wire)->ports)
-#define WIRE_PAYLOAD(wire)     PTR(&(wire)->xPayload)
+#define WIRE_PAYLOAD(wire)     PTR(&(wire)->uPayload)
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE 56
@@ -149,20 +149,18 @@ typedef struct xsock_wire_s {
     u32 iAddrs[2];
     u16 ports[2];
     union {
-            u32 tSeq;
-        struct {
-            u16 uSize;
-            u16 uChecksum;
-        };
-    };
-    union {
         struct { // AS ORIGINAL TCP
+            u32 tSeq;
             u32 tAck;
             u16 tFlags;
             u16 tWindow;
             u32 tSeq2; // CHECKSUM & URGENT
         };
-            u16 xPayload[6]; // AS FAKE UDP
+        struct { // AS FAKE UDP
+            u16 uSize;
+            u16 uChecksum;
+            u16 uPayload[6];
+        };
     };
 } xsock_wire_s;
 
