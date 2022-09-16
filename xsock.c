@@ -225,15 +225,15 @@ typedef struct xsock_path_s {
 #endif
 
 // CONSIDERING THE WITDH
-#define XSOCK_CONN_BURST_MASK ((1ULL << 58) - 1)
+#define XSOCK_CONN_BURST_MASK ((1ULL << 60) - 1)
 
 // EXPECTED SIZE
 #define XSOCK_CONN_SIZE 8
 
 typedef struct xsock_conn_s {
-    u64 burst:58,
-        cdown:3,
-        pid:3;
+    u64 burst:60,
+        cdown:2,
+        pid:2;
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
