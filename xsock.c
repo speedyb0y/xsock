@@ -544,7 +544,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // É TUDO MENOS O HASH
     const uint origSize = ipSize - sizeof(wire->xHash);
 
-    xsock_orig_s* const orig = WIRE_IP(wire) + sizeof(wire->xHash);
+    xsock_orig_s* const orig = PTR(wire);
 
     // RE-ENCAPSULATE
     orig->iVersion  = 0x45;
@@ -571,13 +571,13 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     orig->iChecksum = ip_fast_csum(PTR(orig), 5);
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
-    skb->data            = PTR(orig);
-    skb->mac_header      = PTR(orig) - SKB_HEAD(skb);
-    skb->network_header  = PTR(orig) - SKB_HEAD(skb);
+    skb->data            = PTR(&orig->iVersion);
+    skb->mac_header      = PTR(&orig->iVersion) - SKB_HEAD(skb);
+    skb->network_header  = PTR(&orig->iVersion) - SKB_HEAD(skb);
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
-    skb->tail            = PTR(orig) - SKB_HEAD(skb) + origSize;
+    skb->tail            = PTR(&orig->iVersion) - SKB_HEAD(skb) + origSize;
 #else
-    skb->tail            = PTR(orig) + origSize;
+    skb->tail            = PTR(&orig->iVersion) + origSize;
 #endif
     skb->len             = origSize;
     skb->mac_len         = 0;
