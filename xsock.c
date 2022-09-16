@@ -136,6 +136,9 @@ typedef struct net_device_ops net_device_ops_s;
   - offsetof(xsock_wire_s, tFlags) \
 	))
 
+//
+typedef u32 xsock_wire_hash_t;
+
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE 56
 
@@ -319,7 +322,7 @@ static inline u64 unswap64 (u64 x, const u64 mask) {
 #define A 0xE04EC65E50E04E0EULL
 #define B 0x8A489FE74E0FE1E4ULL
 
-static u32 xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint size) {
+static xsock_wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint size) {
 
     a += A + swap64(b, size);
     b += B + swap64(a, size);
@@ -354,10 +357,10 @@ static u32 xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint size) {
     a += a >> 32;
     a &= 0xFFFFFFFFULL;
 
-    return (u32)a;
+    return (xsock_wire_hash_t)a;
 }
 
-static u32 xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
+static xsock_wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
 
     a += A + swap64(b, size);
     b += B + swap64(a, size);
@@ -390,7 +393,7 @@ static u32 xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
     a += a >> 32;
     a &= 0xFFFFFFFFULL;
 
-    return (u32)a;
+    return (xsock_wire_hash_t)a;
 }
 
 // TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
@@ -827,8 +830,8 @@ static void xsock_setup (net_device_s* const dev) {
     dev->header_ops      = NULL;
     dev->type            = ARPHRD_NONE;
     dev->addr_len        = 0;
-    dev->hard_header_len = offsetof(xsock_wire_s, iVersion) + sizeof(u32);
-    dev->min_header_len  = offsetof(xsock_wire_s, iVersion) + sizeof(u32);
+    dev->hard_header_len = offsetof(xsock_wire_s, iVersion) + sizeof(xsock_wire_hash_t);
+    dev->min_header_len  = offsetof(xsock_wire_s, iVersion) + sizeof(xsock_wire_hash_t);
     //dev->needed_headroom = ;
     //dev->needed_tailroom = ;
     dev->min_mtu         = ETH_MAX_MTU;
