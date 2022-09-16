@@ -617,7 +617,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
         printk("OUT: DROP: SKB START\n");
-        goto drop_unlock;
+        goto drop;
     }
 
     uint ipSize = skb->len;
@@ -627,7 +627,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 
-    // AMBOS TEM O MESMO TAMANHO
+    // AMBOS TEM O MESMO TAMANHO, ENTAO COMECAM NO MESMO LUGAR
     const xsock_orig_s* const orig = PTR(wire);
 
     if (ORIG_IP(orig) + ipSize > SKB_END(skb)) {
