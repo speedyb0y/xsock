@@ -827,8 +827,8 @@ static void xsock_setup (net_device_s* const dev) {
     dev->header_ops      = NULL;
     dev->type            = ARPHRD_NONE;
     dev->addr_len        = 0;
-    dev->hard_header_len = sizeof(xsock_wire_s);
-    dev->min_header_len  = sizeof(xsock_wire_s);
+    dev->hard_header_len = offsetof(xsock_wire_s, iVersion) + sizeof(u32);
+    dev->min_header_len  = offsetof(xsock_wire_s, iVersion) + sizeof(u32);
     //dev->needed_headroom = ;
     //dev->needed_tailroom = ;
     dev->min_mtu         = ETH_MAX_MTU;
