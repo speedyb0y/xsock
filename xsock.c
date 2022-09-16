@@ -558,8 +558,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
       || wire->iAddrs[1] != BE32(ADDR_SRV)
       || wire-> ports[1] != BE16(XSOCK_PORT)
 #endif
-    ) // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
+    ) { // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
+        printk("OUT: DROP: crazy\n");
         goto drop;
+    }
 
 #if XSOCK_SERVER
     const uint hid = BE32(wire->iAddrs[1]) & 0xFF;
@@ -703,6 +705,7 @@ wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
 
 drop_unlock:
     spin_unlock_irq(&host->lock);
+    printk("OUT: UNLOCKED\n");
 
 drop:
     printk("OUT: DROP\n");
