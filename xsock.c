@@ -513,6 +513,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->data            = WIRE_IP(wire);
     skb->mac_header      = WIRE_IP(wire) - SKB_HEAD(skb);
     skb->network_header  = WIRE_IP(wire) - SKB_HEAD(skb);
+#ifdef NET_SKBUFF_DATA_USES_OFFSET
+    skb->tail            = WIRE_IP(wire) - SKB_HEAD(skb) + ipSize;
+#else
+    skb->tail            = WIRE_IP(wire) + ipSize;
+#endif
     skb->len             = ipSize;
     skb->mac_len         = 0;
     skb->ip_summed       = CHECKSUM_UNNECESSARY;
@@ -734,6 +739,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->mac_header       = WIRE_ETH(wire) - SKB_HEAD(skb);
     skb->network_header   = WIRE_IP (wire) - SKB_HEAD(skb);
     skb->transport_header = WIRE_UDP(wire) - SKB_HEAD(skb);
+#ifdef NET_SKBUFF_DATA_USES_OFFSET
+    skb->tail             = WIRE_ETH(wire) - SKB_HEAD(skb) + ETH_HLEN + ipSize;
+#else
+    skb->tail             = WIRE_ETH(wire) + ETH_HLEN + ipSize;
+#endif
     skb->mac_len          = ETH_HLEN;
     skb->len              = ETH_HLEN + ipSize;
     skb->ip_summed        = CHECKSUM_NONE;
