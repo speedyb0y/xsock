@@ -632,7 +632,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
      || orig->iSrc != BE32(VADDR_SRV)
      || orig->tSrc != BE16(VPORT_SRV)
 #else
-     || orig->iSrc != BE32(VADDR_CLT + XSOCK_HOST_ID)
      || orig->iDst != BE32(VADDR_SRV)
      || orig->tDst != BE16(VPORT_SRV)
 #endif
@@ -645,7 +644,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const uint hid = BE32(orig->iDst) - VADDR_CLT;
     const uint cid = BE16(orig->tDst);
 #else
-    const uint hid = XSOCK_HOST_ID;
+    const uint hid = BE32(orig->iSrc) - VADDR_CLT;
     const uint cid = BE16(orig->tSrc);
 #endif
 
