@@ -627,7 +627,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
     if (ipSize != SKB_END(skb) - WIRE_IP(wire)) {
-        printk("OUT: DROP: IP SIZE MISMATCH SKB LEN\n");
+        printk("OUT: DROP: BAD IP SIZE\n");
         goto drop;
     }
 
