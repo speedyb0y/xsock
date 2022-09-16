@@ -753,22 +753,22 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
 
+    // REMEMBER AFTER UNLOCKING
+    net_device_s* const itfc = path->itfc;
+
     // RE-ENCAPSULATE
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
+ // wire->iVersion
+ // wire->iTOS
     wire->iSrc = path->iSrc;
     wire->iDst = path->iDst;
     wire->uDst = path->uDst;
 
-    // REMEMBER AFTER UNLOCKING
-    net_device_s* const itfc = path->itfc;
-
     spin_unlock_irq(&host->lock);
 
     // FINISH AND ENCODE
- // wire->iVersion
- // wire->iTOS
     wire->iCID        = BE16(cid);
     wire->iSize       = BE16(ipSize);
     wire->iFrag       = 0;
