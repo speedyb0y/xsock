@@ -472,14 +472,6 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
     }
 
-    // WE MAY BE FORWARDING OTHER HOSTS'S XSOCK
-#if !XSOCK_SERVER
-    if (hid != XSOCK_HOST_ID) {
-        printk("IN: PASS: NOT MY HID\n");
-        return RX_HANDLER_PASS;
-    }
-#endif
-
     // VALIDATE PATH ID
     if (pid >= XSOCK_PATHS_N) {
         printk("IN: DROP: BAD PID\n");
@@ -572,7 +564,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     orig->tDst      = BE16(VPORT_CLT);
 #else
     orig->iSrc      = BE32(VADDR_SRV);
-    orig->iDst      = BE32(VADDR_CLT + XSOCK_HOST_ID);
+    orig->iDst      = BE32(VADDR_CLT + hid);
     orig->tSrc      = BE16(VPORT_CLT);
     orig->tDst      = BE16(cid);
 #endif
