@@ -781,14 +781,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     wire->uSrc        = BE16(XSOCK_PORT);
     wire->uDst        = BE16(PORT(hid, pid));
 #endif
-    wire->uSize       = BE16(ipSize - 20);
-    wire->uChecksum   = 0;
-    wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
-    wire->tSeq        = wire->xHash;
 
     spin_unlock_irq(&host->lock);
 
     // ENCODE
+    wire->uSize       = BE16(ipSize - 20);
+    wire->uChecksum   = 0;
+    wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
+    wire->tSeq        = wire->xHash;
     wire->xHash = BE32(xsock_out_encrypt(hid, cid,
         WIRE_PAYLOAD(wire),
         WIRE_PAYLOAD_SIZE(ipSize)
