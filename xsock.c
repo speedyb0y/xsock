@@ -593,8 +593,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     spin_lock_irqsave(&host->lock, irqStatus);
 
-
-
     xsock_conn_s* const conn = &host->conns[cid];
 
     const uint now = ((u64)jiffies) & 0xFFFFFFFFULL;
