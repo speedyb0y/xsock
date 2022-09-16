@@ -183,8 +183,7 @@ typedef struct xsock_orig_s {
     u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u16 tChecksum;
-    u16 tUrgent;
+    u32 tSeq2;
 } xsock_orig_s;
 
 // EXPECTED SIZE
@@ -540,12 +539,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     orig->tSrc      = BE16(XSOCK_PORT);
     orig->tDst      = BE16(cid);
 #endif
-    orig->tSeq      = wire->tSeq2;
- // orig->tAck
- // orig->tFlags
- // orig->tWindow
-    orig->tChecksum = 0;
-    orig->tUrgent   = 0;
+    orig->tSeq      = orig->tSeq2;
+    orig->tSeq2     = 0;
     orig->iChecksum = ip_fast_csum(PTR(orig), 5);
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
@@ -741,7 +736,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const uint ipSize = origSize + sizeof(u32);
 
     // MOVE ANTES DE SOBRESCREVER
-    wire->tSeq2       = orig->tSeq;
+    orig->tSeq2       = orig->tSeq;
     // RE-ENCAPSULATE
  // wire->iVersion
  // wire->iTOS
