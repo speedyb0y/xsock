@@ -303,35 +303,31 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
     a += A + swap64(b, size);
     b += B + swap64(a, size);
 
-#if 1
     while (size >= sizeof(u64)) {
         const u64 orig = BE64(*(u64*)data);
         u64 value = orig;
         value = swap64(value, size);
         value = swap64(value, a);
         value = swap64(value, b);
-        //*(u64*)data = BE64(value);
+        *(u64*)data = BE64(value);
         a += swap64(orig, size);
         b += swap64(a, orig);
         data += sizeof(u64);
         size -= sizeof(u64);
     }
-#endif
 
-#if 1
     while (size) {
         const u8 orig = *(u8*)data;
         u64 value = orig;
         value += swap64(a, size);
         value += swap64(b, size);
         value &= 0xFFU;
-        //*(u8*)data = value;
+        *(u8*)data = value;
         a += swap64(b, orig);
         b += swap64(orig, a);
         data += sizeof(u8);
         size -= sizeof(u8);
     }
-#endif
 
     a += b;
     a += a >> 32;
@@ -340,46 +336,41 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
     return (wire_hash_t)a;
 }
 
-#define xsock_in_decrypt xsock_out_encrypt
-//static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
+static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
 
-    //a += A + swap64(b, size);
-    //b += B + swap64(a, size);
+    a += A + swap64(b, size);
+    b += B + swap64(a, size);
 
-//#if 1
-    //while (size >= sizeof(u64)) {
-        //u64 orig = BE64(*(u64*)data);
-        //orig = unswap64(orig, b);
-        //orig = unswap64(orig, a);
-        //orig = unswap64(orig, size);
-        ////*(u64*)data = BE64(orig);
-        //a += swap64(orig, size);
-        //b += swap64(a, orig);
-        //data += sizeof(u64);
-        //size -= sizeof(u64);
-    //}
-//#endif
+    while (size >= sizeof(u64)) {
+        u64 orig = BE64(*(u64*)data);
+        orig = unswap64(orig, b);
+        orig = unswap64(orig, a);
+        orig = unswap64(orig, size);
+        *(u64*)data = BE64(orig);
+        a += swap64(orig, size);
+        b += swap64(a, orig);
+        data += sizeof(u64);
+        size -= sizeof(u64);
+    }
 
-//#if 1
-    //while (size) {
-        //u64 orig = *(u8*)data;
-        //orig -= swap64(b, size);
-        //orig -= swap64(a, size);
-        //orig &= 0xFFU;
-        ////*(u8*)data = orig;
-        //a += swap64(b, orig);
-        //b += swap64(orig, a);
-        //data += sizeof(u8);
-        //size -= sizeof(u8);
-    //}
-//#endif
+    while (size) {
+        u64 orig = *(u8*)data;
+        orig -= swap64(b, size);
+        orig -= swap64(a, size);
+        orig &= 0xFFU;
+        *(u8*)data = orig;
+        a += swap64(b, orig);
+        b += swap64(orig, a);
+        data += sizeof(u8);
+        size -= sizeof(u8);
+    }
 
-    //a += b;
-    //a += a >> 32;
-    //a &= 0xFFFFFFFFULL;
+    a += b;
+    a += a >> 32;
+    a &= 0xFFFFFFFFULL;
 
-    //return (wire_hash_t)a;
-//}
+    return (wire_hash_t)a;
+}
 
 // TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
 static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
@@ -472,25 +463,25 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     spin_lock_irqsave(&host->lock, irqStatus);
 
     if (unlikely(path->iHash != hash)) {
-                 path->iHash =  hash;
-                 path->itfc = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-                 path->eDst[0]   = wire->eSrc[0];
-                 path->eDst[1]   = wire->eSrc[1];
-                 path->eDst[2]   = wire->eSrc[2];
-                 path->eSrc[0]   = wire->eDst[0];
-                 path->eSrc[1]   = wire->eDst[1];
-                 path->eSrc[2]   = wire->eDst[2];
-                 path->iAddrs[1] = wire->iAddrs[0];
-                 path->iAddrs[0] = wire->iAddrs[1];
-                 path->cport     = wire->ports[0];
-#if 1
+
+        path->iHash     = hash;
+        path->itfc      = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
+        path->eDst[0]   = wire->eSrc[0];
+        path->eDst[1]   = wire->eSrc[1];
+        path->eDst[2]   = wire->eSrc[2];
+        path->eSrc[0]   = wire->eDst[0];
+        path->eSrc[1]   = wire->eDst[1];
+        path->eSrc[2]   = wire->eDst[2];
+        path->iAddrs[1] = wire->iAddrs[0];
+        path->iAddrs[0] = wire->iAddrs[1];
+        path->cport     = wire->ports[0];
+
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " 0x%04X%04X%04X 0x%08X %u ->"
             " 0x%04X%04X%04X 0x%08X %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
             _MAC(path->eSrc), _IP4(path->iAddrs[0]), BE16(wire->ports[1]),
             _MAC(path->eDst), _IP4(path->iAddrs[1]), BE16(path->cport));
-#endif
     }
 
     path->iActive = jiffies + path->iTimeout*HZ;
