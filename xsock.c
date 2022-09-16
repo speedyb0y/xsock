@@ -559,9 +559,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const uint ipSize = skb->len + sizeof(wire_hash_t);
 
     // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
-    if (PTR(wire) < SKB_HEAD(skb)
-     || WIRE_IP(wire) + ipSize > SKB_END(skb)) {
-        printk("OUT: DROP: SKB\n");
+    if (PTR(wire) < SKB_HEAD(skb)) {
+        printk("OUT: DROP: SKB START\n");
+        goto drop;
+    }
+
+    if (WIRE_IP(wire) + ipSize > SKB_END(skb)) {
+        printk("OUT: DROP: SKB END\n");
         goto drop;
     }
 
@@ -706,7 +710,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #endif
     *(u64*)wire->iAddrs  =
     *(u64*)path->iAddrs;
-    
+
 wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
