@@ -171,7 +171,8 @@ typedef struct xsock_wire_s {
     u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u32 tSeq2;
+    u16 tChecksum;
+    u16 tUrgent;
 // TCP PAYLOAD
 } xsock_wire_s;
 
