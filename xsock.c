@@ -544,7 +544,7 @@ drop:
 
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
-    if (skb->protocol !=  BE16(ETH_P_IP)) {
+    if (skb->protocol != BE16(ETH_P_IP)) {
         printk("OUT: DROP: NOT IPV4\n");
         goto drop;
     }
@@ -566,6 +566,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     if (WIRE_IP(wire) + ipSize > SKB_END(skb)) {
         printk("OUT: DROP: SKB END\n");
+        goto drop;
+    }
+
+    if (wire->iSize != BE16(skb->len)) {
+        printk("OUT: DROP: wire->iSize %u != skb->len %u\n",
+            wire->iSize, skb->len);
         goto drop;
     }
 
