@@ -131,8 +131,11 @@ typedef struct net_device_ops net_device_ops_s;
 #define WIRE_UDP(wire)     PTR(&(wire)->uSrc)
 #define WIRE_PAYLOAD(wire) PTR(&(wire)->tAck)
 
-// ENCAPSULED IP SIZE -> ORIGINAL IP SIZE
-#define WIRE_PAYLOAD_SIZE(ipSize) ((ipSize) - sizeof(xsock_wire_hash_t))
+// ENCAPSULED IP SIZE -> PAYLOAD SIZE
+#define WIRE_PAYLOAD_SIZE(ipSize) ((ipSize) - ( \
+	offsetof(xsock_wire_s, tAck) - \
+	offsetof(xsock_wire_s, iVersion) \
+	))
 
 //
 typedef u32 xsock_wire_hash_t;
