@@ -589,9 +589,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
         = BE32(xsock_out_encrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 32));
 
-    unsigned long irqStatus;
-
-    spin_lock_irqsave(&host->lock, irqStatus);
+    spin_lock_irq(&host->lock);
 
     xsock_conn_s* const conn = &host->conns[cid];
 
@@ -692,7 +690,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
 
-    spin_unlock_irqrestore(&host->lock, irqStatus);
+    spin_unlock_irqrestore(&host->lock);
 
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
@@ -702,7 +700,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     return NETDEV_TX_OK;
 
 drop_unlock:
-    spin_unlock_irqrestore(&host->lock, irqStatus);
+
+    spin_unlock_irqrestore(&host->lock);
+
 drop:
     printk("OUT: DROP\n");
 
