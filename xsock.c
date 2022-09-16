@@ -565,7 +565,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
     if (WIRE_IP(wire) + ipSize > SKB_END(skb)) {
-        printk("OUT: DROP: SKB END\n");
+        printk("OUT: DROP: SKB END: WIRE_IP(wire) %llu + ipSize %llu > SKB_END(skb) %llu\n",
+            (uintll)WIRE_IP(wire),
+            (uintll)ipSize,
+            (uintll)SKB_END(skb));
         goto drop;
     }
 
