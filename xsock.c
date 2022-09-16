@@ -621,12 +621,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     // THE ENCAPSULED IP SIZE
     uint ipSize = skb->len + sizeof(wire->xHash);
 
-    if (offsetof(xsock_wire_s, iVersion) + ipSize < sizeof(xsock_wire_s)) {
+    if (ipSize < sizeof(xsock_wire_s) - offsetof(xsock_wire_s, iVersion)) {
         printk("OUT: DROP: TOO SMALL\n");
         goto drop;
     }
 
-    if (WIRE_IP(wire) + ipSize != SKB_END(skb)) {
+    if (ipSize != SKB_END(skb) - WIRE_IP(wire)) {
         printk("OUT: DROP: IP SIZE MISMATCH SKB LEN\n");
         goto drop;
     }
