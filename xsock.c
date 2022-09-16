@@ -216,8 +216,8 @@ typedef struct xsock_conn_s {
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
-    rwlock_t lock;
-    char _pad[CACHE_LINE_SIZE - sizeof(rwlock_t)];
+    spinlock_t lock;
+    char _pad[CACHE_LINE_SIZE - sizeof(spinlock_t)];
     xsock_path_s paths[XSOCK_PATHS_N];
     xsock_conn_s conns[XSOCK_CONNS_N];
 } xsock_host_s;
@@ -467,7 +467,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     unsigned long irqStatus;
 
-    write_lock_irqsave(&host->lock, irqStatus);
+    spin_lock_irqsave(&host->lock, irqStatus);
 
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
@@ -493,7 +493,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     path->iActive = jiffies + path->iTimeout*HZ;
 
-    write_unlock_irqrestore(&host->lock, irqStatus);
+    spin_unlock_irqrestore(&host->lock, irqStatus);
 #endif
 
     // RE-ENCAPSULATE
@@ -583,7 +583,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     unsigned long irqStatus;
 
-    write_lock_irqsave(&host->lock, irqStatus);
+    spin_lock_irqsave(&host->lock, irqStatus);
 
 #if XSOCK_SERVER
     const uint cid = BE16(wire->ports[1]);
@@ -704,7 +704,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
 
-    write_unlock_irqrestore(&host->lock, irqStatus);
+    spin_unlock_irqrestore(&host->lock, irqStatus);
 
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
@@ -714,7 +714,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     return NETDEV_TX_OK;
 
 drop_unlock:
-    write_unlock_irqrestore(&host->lock, irqStatus);
+    spin_unlock_irqrestore(&host->lock, irqStatus);
 drop:
     printk("OUT: DROP\n");
 
@@ -814,7 +814,7 @@ static int __init xsock_init (void) {
         printk_host("INITIALIZING\n");
 
         //
-        rwlock_init(&host->lock);
+        spin_lock_init(&host->lock);
 
         // INITIALIZE CONNECTIONS
         foreach (cid, XSOCK_CONNS_N) {
