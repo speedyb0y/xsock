@@ -493,7 +493,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     }
 
     // DROP INCOMPLETE PACKETS
-    if ((WIRE_IP(wire) + ipSize) > SKB_TAIL(skb)) {
+    if (ipSize > SKB_TAIL(skb) - WIRE_IP(wire)) {
         printk("IN: DROP: INCOMPLETE\n");
         goto drop;
     }
