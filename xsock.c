@@ -90,12 +90,12 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE HOST AND PATH
-#define PORT(hid, pid) (XSOCK_PORT + (hid)*10 + (pid))
-#define PORT_HID(port) (((uint)(port) - XSOCK_PORT) / 10)
-#define PORT_PID(port) (((uint)(port) - XSOCK_PORT) % 10)
+#define TPORT(hid, pid) (XSOCK_PORT + (hid)*10 + (pid))
+#define TPORT_HID(port) (((uint)(port) - XSOCK_PORT) / 10)
+#define TPORT_PID(port) (((uint)(port) - XSOCK_PORT) % 10)
 
 // O ULTIMO HOST E ULTIMO PATH TEM QUE DAR UMA PORTA VALIDA
-#if PORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
+#if TPORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
 #error "BAD XSOCK_PORT / XSOCK_HOSTS_N / XSOCK_PATHS_N"
 #endif
 
@@ -453,15 +453,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
 #if XSOCK_SERVER
-    if (srvPort < PORT(0, 0)
-     || srvPort > PORT(XSOCK_HOSTS_N - 1,
-                       XSOCK_PATHS_N - 1))
+    if (srvPort < TPORT(0, 0)
+     || srvPort > TPORT(XSOCK_HOSTS_N - 1,
+                        XSOCK_PATHS_N - 1))
         return RX_HANDLER_PASS;
 #endif
 
     // IDENTIFY HOST, PATH AND CONN
-    const uint hid = PORT_HID(srvPort);
-    const uint pid = PORT_PID(srvPort);
+    const uint hid = TPORT_HID(srvPort);
+    const uint pid = TPORT_PID(srvPort);
     const uint cid = BE16(wire->iCID);
 
     // VALIDATE HOST ID
@@ -776,10 +776,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     wire->iProtocol   = IPPROTO_UDP;
     wire->iChecksum   = 0;
 #if XSOCK_SERVER
-    wire->uSrc        = BE16(PORT(hid, pid));
+    wire->uSrc        = BE16(TPORT(hid, pid));
 #else
     wire->uSrc        = BE16(XSOCK_PORT);
-    wire->uDst        = BE16(PORT(hid, pid));
 #endif
     wire->uSize       = BE16(ipSize - sizeof(struct iphdr));
     wire->uChecksum   = 0;
@@ -961,19 +960,20 @@ static int __init xsock_init (void) {
                 _MAC(this->eDst), _IP4(peer->addr32)
             );
 
-         // path->itfc       --> NULL
-         // path->oLast      --> 0
-         // path->oRemaining --> 0
-            path->oPkts     = oPkts;
+            path->itfc       = NULL;
+            path->oLast      = 0;
+            path->oRemaining = 0;
+            path->oPkts      = oPkts;
 #if XSOCK_SERVER
-         // path->uDst     --> 0
-            path->iTimeout  = this->iTimeout;
-         // path->iActive   --> 0
-         // path->iHash     --> 0
+            path->uDst       = 0;
+            path->iTimeout   = this->iTimeout;
+            path->iActive    = 0;
+            path->iHash      = 0;
 #else
-         // path->reserved0 --> 0
-         // path->reserved1 --> 0
-         // path->reserved2 --> 0
+            path->uDst       = BE16(TPORT(XSOCK_HOST_ID, pid));
+            path->reserved0  = 0;
+            path->reserved1  = 0;
+            path->reserved2  = 0;
 #endif
             path->eDst[0]    = this->eDst[0];
             path->eDst[1]    = this->eDst[1];
