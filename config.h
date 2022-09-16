@@ -23,9 +23,9 @@
 #define IP_1_D 20
 #define IP_2_C 1
 #define IP_2_D 20
-#define ITFC0 "eth0"
+#define ITFC0 "eth0xxx"
 #define ITFC1 "eth0xx"
-#define ITFC2 "eth0xxx"
+#define ITFC2 "eth0"
 #define MAC0 "\xd0\x50\x99\xae\xde\x92"
 #define MAC1 "\xd0\x50\x99\xae\xde\x92"
 #define MAC2 "\xd0\x50\x99\xae\xde\x92"
