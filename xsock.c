@@ -554,9 +554,19 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     const uint ipSize = skb->len + sizeof(wire_hash_t);
 
+    // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
     if (PTR(wire) < SKB_HEAD(skb)
-     || WIRE_IP(wire) + ipSize > SKB_END(skb)
-      || wire->iProtocol != IPPROTO_TCP
+     || WIRE_IP(wire) + ipSize > SKB_END(skb)) {
+        printk("OUT: DROP: SKB\n");
+        goto drop;
+    }
+
+    if (wire->iProtocol != IPPROTO_TCP) {
+        printk("OUT: DROP: NOT TCP\n");
+        goto drop;
+    }
+
+    if (0
 #if XSOCK_SERVER
       || wire->iAddrs[0] != BE32(ADDR_SRV)
       || wire-> ports[0] != BE16(XSOCK_PORT)
@@ -565,7 +575,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
       || wire->iAddrs[1] != BE32(ADDR_SRV)
       || wire-> ports[1] != BE16(XSOCK_PORT)
 #endif
-    ) { // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
+    ) {
         printk("OUT: DROP: crazy\n");
         goto drop;
     }
@@ -617,6 +627,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         ) ? XSOCK_PATHS_N
         : conn->cdown;
 
+    // TODO: FIXME:    SE ESTIVERMOS ENVIANDO UMA RETRANSMISSAO, DE ACORDO COM O ACK/SEQ, ENTAO MUDAR DE PATH?
     // SE ESTA INICIANDO OU SE COMPLETOU O BURST, PASSA PARA O PRÓXIMO PATH
     uint pid = (uint)conn->pid + (cdown || conn->burst < now);
 
