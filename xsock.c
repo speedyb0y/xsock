@@ -413,11 +413,13 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
+    // CONFIRM IT HAS NO IP OPTIONS
+    // CONFIRM IT'S NOT FRAGMENTED - TODO: FIXME: IGNORE THE DON'T FRAGMENT FLAG
     if (PTR(wire) + sizeof(*wire) > SKB_TAIL(skb)
 || WIRE_ETH(wire)                 < SKB_HEAD(skb)
-         || wire->iFrag
-         || wire->eType != BE16(ETH_P_IP)
-         || wire->iProtocol != IPPROTO_UDP)
+         || wire->iVersion != 0x45
+         || wire->iProtocol != IPPROTO_UDP
+         || wire->iFrag)
         return RX_HANDLER_PASS;
 
 #if XSOCK_SERVER
