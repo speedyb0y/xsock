@@ -987,8 +987,13 @@ static void __exit xsock_exit (void) {
 
                 rtnl_lock();
 
-                if (rcu_dereference(itfc->rx_handler) == xsock_in)
+                if (rcu_dereference(itfc->rx_handler) == xsock_in) {
                     netdev_rx_handler_unregister(itfc);
+    itfc->hard_header_len -= offsetof(xsock_wire_s, iVersionTOS);
+    itfc->min_header_len  -= offsetof(xsock_wire_s, iVersionTOS);
+    itfc->needed_headroom -= 64; // ???
+    itfc->needed_tailroom -= 64;
+                }
 
                 rtnl_unlock();
 
