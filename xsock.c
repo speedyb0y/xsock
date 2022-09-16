@@ -621,7 +621,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     // THE ENCAPSULED IP SIZE
     uint ipSize = skb->len + sizeof(wire->xHash);
 
-    if (ipSize < (sizeof(xsock_wire_s) - offsetof(xsock_wire_s, iVersion))) {
+    if (ipSize < (sizeof(xsock_wire_s)
+              - offsetof(xsock_wire_s, iVersion))) {
         printk("OUT: DROP: TOO SMALL\n");
         goto drop;
     }
