@@ -303,14 +303,14 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
     a += A + swap64(b, size);
     b += B + swap64(a, size);
 
-#if 0
+#if 1
     while (size >= sizeof(u64)) {
         const u64 orig = BE64(*(u64*)data);
         u64 value = orig;
         value = swap64(value, size);
         value = swap64(value, a);
         value = swap64(value, b);
-        *(u64*)data = BE64(value);
+        //*(u64*)data = BE64(value);
         a += swap64(orig, size);
         b += swap64(a, orig);
         data += sizeof(u64);
@@ -318,14 +318,14 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
     }
 #endif
 
-#if 0
+#if 1
     while (size) {
         const u8 orig = *(u8*)data;
         u64 value = orig;
         value += swap64(a, size);
         value += swap64(b, size);
         value &= 0xFFU;
-        *(u8*)data = value;
+        //*(u8*)data = value;
         a += swap64(b, orig);
         b += swap64(orig, a);
         data += sizeof(u8);
@@ -345,13 +345,13 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint siz
     a += A + swap64(b, size);
     b += B + swap64(a, size);
 
-#if 0
+#if 1
     while (size >= sizeof(u64)) {
         u64 orig = BE64(*(u64*)data);
         orig = unswap64(orig, b);
         orig = unswap64(orig, a);
         orig = unswap64(orig, size);
-        *(u64*)data = BE64(orig);
+        //*(u64*)data = BE64(orig);
         a += swap64(orig, size);
         b += swap64(a, orig);
         data += sizeof(u64);
@@ -359,13 +359,13 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint siz
     }
 #endif
 
-#if 0
+#if 1
     while (size) {
         u64 orig = *(u8*)data;
         orig -= swap64(b, size);
         orig -= swap64(a, size);
         orig &= 0xFFU;
-        *(u8*)data = orig;
+        //*(u8*)data = orig;
         a += swap64(b, orig);
         b += swap64(orig, a);
         data += sizeof(u8);
@@ -388,8 +388,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // TODO: FIXME: DESCOBRIR O QUE CAUSA TANTOS SKBS NAO LINEARES AQUI
     // TODO: FIXME: pskb vs skb??? sera que vai te rque fazer skb_copy() e depois *pskb = skb ?
     // e aí faz ou não kfree_skb()?
-    if (skb_linearize(skb))
+    if (skb_linearize(skb)) {
+        printk("IN: DROP: NON LINEAR\n");
         goto drop;
+    }
 
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
@@ -440,8 +442,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint ipSize = BE16(wire->iSize) - sizeof(wire_hash_t);
 
     // DROP INCOMPLETE PACKETS
-    if ((WIRE_IP(wire) + ipSize + sizeof(wire_hash_t)) > SKB_TAIL(skb))
+    if ((WIRE_IP(wire) + ipSize + sizeof(wire_hash_t)) > SKB_TAIL(skb)) {
+        printk("IN: DROP: INCOMPLETE\n");
         goto drop;
+    }
 
     // DECRYPT AND CONFIRM AUTHENTICITY
     if (xsock_in_decrypt(hid, cid, WIRE_UDP_PAYLOAD(wire), ipSize - 28)
