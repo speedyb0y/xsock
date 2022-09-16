@@ -759,13 +759,22 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop_unlock;
     }
 
-    // NOW THE ENCAPSULED IP SIZE
-    ipSize += sizeof(wire->xHash);
-
     // RE-ENCAPSULATE
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
+    wire->iSrc        = path->iSrc;
+    wire->iDst        = path->iDst;
+#if XSOCK_SERVER
+    wire->uDst        = path->uDst; // THE CLIENT IS BEHIND NAT
+#endif
+
+    spin_unlock_irq(&host->lock);
+
+    // NOW THE ENCAPSULED IP SIZE
+    ipSize += sizeof(wire->xHash);
+
+    // FINISH AND ENCODE
  // wire->iVersion
  // wire->iTOS
     wire->iCID        = BE16(cid);
@@ -774,19 +783,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     wire->iTTL        = 64;
     wire->iProtocol   = IPPROTO_UDP;
     wire->iChecksum   = 0;
-    wire->iSrc        = path->iSrc;
-    wire->iDst        = path->iDst;
 #if XSOCK_SERVER
     wire->uSrc        = BE16(PORT(hid, pid));
-    wire->uDst        = path->uDst; // THE CLIENT IS BEHIND NAT
 #else
     wire->uSrc        = BE16(XSOCK_PORT);
     wire->uDst        = BE16(PORT(hid, pid));
 #endif
-
-    spin_unlock_irq(&host->lock);
-
-    // ENCODE
     wire->uSize       = BE16(ipSize - sizeof(struct iphdr));
     wire->uChecksum   = 0;
     wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
