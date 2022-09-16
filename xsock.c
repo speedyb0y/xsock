@@ -159,9 +159,10 @@ typedef struct xsock_wire_s {
     u32 iDst;
     u16 uSrc;
     u16 uDst;
-    u16 uSize;
-    u16 uChecksum;
-    u32 xHash; // tSeq
+    u16 uSize; // tSeq
+    u16 uChecksum; // tSeq
+    
+    u32 xHash; // tAck
 } xsock_wire_s;
 
 #define XSOCK_ORIG_SIZE 40
@@ -179,8 +180,10 @@ typedef struct xsock_orig_s {
     u32 iDst;
     u16 tSrc;
     u16 tDst;
+    
     u32 tSeq;
-    u32 tAck;
+    
+    u32 tAck;    
     u16 tFlags;
     u16 tWindow;
     u32 tSeq2; // CHECKSUM, URGENT
