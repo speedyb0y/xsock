@@ -210,9 +210,9 @@ typedef struct xsock_path_s {
 #define XSOCK_CONN_SIZE 8
 
 typedef struct xsock_conn_s {
-    u64 burst:58,
+    u64 burst:59,
         cdown:3,
-        pid:3;
+        pid:2;
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
