@@ -65,8 +65,8 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
 #define XSOCK_HOST_ID     XCONF_XSOCK_HOST_ID
 
-#define VADDR_SRV 0xC00000FFU // 192.0.0.255
 #define VADDR_CLT 0xC0000000U // 192.0.0.0
+#define VADDR_SRV 0xC00000FFU // 192.0.0.255
 
 #define VPORT_CLT 4000
 #define VPORT_SRV 2000
@@ -173,8 +173,7 @@ typedef struct xsock_wire_s {
     u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u16 tChecksum;
-    u16 tUrgent;
+    u32 tSeq2;
 // TCP PAYLOAD
 } xsock_wire_s;
 
@@ -750,7 +749,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     // ENTAO VAI PARA O FIM DE UM, DEPOIS VOLTA PARA O COMEÇO DO OUTRO
     xsock_wire_s* const wire = PTR(orig)
         + sizeof(xsock_orig_s)
-        - sizeof(xsock_wire_s;
+        - sizeof(xsock_wire_s);
 
     //
     if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
