@@ -129,24 +129,25 @@ typedef struct net_device_ops net_device_ops_s;
 #define WIRE_ETH(wire)     PTR(&(wire)->eDst)
 #define WIRE_IP(wire)      PTR(&(wire)->iVersion)
 #define WIRE_UDP(wire)     PTR(&(wire)->uSrc)
-#define WIRE_PAYLOAD(wire) (PTR(wire) + sizeof(xsock_wire_s))
+#define WIRE_PAYLOAD(wire) PTR(&(wire)->tAck)
 
-#define WIRE_PAYLOAD_SIZE(ipSize) (ipSize - ( \
-      sizeof(xsock_wire_s) - \
-    offsetof(xsock_wire_s, iVersion) \
-    ))
+// ENCAPSULED IP SIZE -> ORIGINAL IP SIZE
+#define WIRE_PAYLOAD_SIZE(ipSize) ((ipSize) - sizeof(xsock_wire_hash_t))
 
 //
 typedef u32 xsock_wire_hash_t;
 
 // EXPECTED SIZE
-#define XSOCK_WIRE_SIZE 48
+#define XSOCK_WIRE_SIZE 64
 
 typedef struct xsock_wire_s {
-    u16 _align;
+// 6 ALIGNMENT
+    u16 _align[3];
+// 14 ETH
     u16 eDst[ETH_ALEN/sizeof(u16)];
     u16 eSrc[ETH_ALEN/sizeof(u16)];
     u16 eType;
+// 20 IP
     u8  iVersion;
     u8  iTOS;
     u16 iSize;
@@ -157,17 +158,30 @@ typedef struct xsock_wire_s {
     u16 iChecksum;
     u32 iSrc;
     u32 iDst;
+// 8 UDP
     u16 uSrc;
     u16 uDst;
-    u16 uSize; // tSeq
-    u16 uChecksum; // tSeq
-    
-    u32 xHash; // tAck
+    u16 uSize;
+    u16 uChecksum;
+// 16 TCP REMAINING
+    u32 xHash; // tSeq
+    u32 tAck;
+    u16 tFlags;
+    u16 tWindow;
+    u32 tSeq; // tChecksum, tUrgent
+// TCP PAYLOAD
 } xsock_wire_s;
 
-#define XSOCK_ORIG_SIZE 40
+#define XSOCK_ORIG_SIZE 64
 
 typedef struct xsock_orig_s {
+// 10 ALIGNMENT
+    u16 _align[5];
+// 14 ETH
+    u16 eDst[ETH_ALEN/sizeof(u16)];
+    u16 eSrc[ETH_ALEN/sizeof(u16)];
+    u16 eType;
+// 20 IP
     u8  iVersion;
     u8  iTOS;
     u16 iSize;
@@ -178,15 +192,16 @@ typedef struct xsock_orig_s {
     u16 iChecksum;
     u32 iSrc;
     u32 iDst;
+// 20 TCP
     u16 tSrc;
     u16 tDst;
-    
     u32 tSeq;
-    
-    u32 tAck;    
+    u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u32 tSeq2; // CHECKSUM, URGENT
+    u16 tChecksum;
+    u16 tUrgent;
+// TCP PAYLOAD
 } xsock_orig_s;
 
 // EXPECTED SIZE
@@ -523,9 +538,9 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // É TUDO MENOS O HASH
-    const uint origSize = ipSize - sizeof(u32);
+    const uint origSize = ipSize - sizeof(wire->xHash);
 
-    xsock_orig_s* const orig = WIRE_IP(wire) + sizeof(u32);
+    xsock_orig_s* const orig = WIRE_IP(wire) + sizeof(wire->xHash);
 
     // RE-ENCAPSULATE
     orig->iVersion  = 0x45;
@@ -606,18 +621,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
     if (PTR(orig) + origSize > SKB_END(skb)) {
-        printk("OUT: DROP: SKB END\n");
-        goto drop;
-    }
-
-    //
-    xsock_wire_s* const wire = PTR(orig)
-        + sizeof(xsock_orig_s)
-        - sizeof(xsock_wire_s);
-
-    //
-    if (PTR(wire) < SKB_HEAD(skb)) {
-        printk("OUT: DROP: SKB START\n");
+        printk("OUT: DROP: INCOMPLETE\n");
         goto drop;
     }
 
@@ -733,6 +737,15 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->pid   = pid;
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
+
+    //
+    xsock_wire_s* const wire = PTR(&orig->tAck) - sizeof(xsock_wire_s);
+
+    //
+    if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
+        printk("OUT: DROP: SKB START\n");
+        goto drop_unlock;
+    }
 
     //
     net_device_s* const itfc = path->itfc;
