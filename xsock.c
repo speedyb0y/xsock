@@ -902,12 +902,6 @@ static int __init xsock_init (void) {
 
     xdev = dev;
 
-#if XSOCK_SERVER
-    memset(hosts, 0, sizeof(hosts));
-#else
-    memset(host, 0, sizeof(host));
-#endif
-
     // INITIALIZE HOSTS
 #if XSOCK_SERVER
     foreach (hid, XSOCK_HOSTS_N) {
