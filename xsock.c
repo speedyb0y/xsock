@@ -216,6 +216,8 @@ typedef struct xsock_conn_s {
 } xsock_conn_s;
 
 typedef struct xsock_host_s {
+    rwlock_t lock;
+    char _pad[CACHE_LINE_SIZE - sizeof(rwlock_t)];
     xsock_path_s paths[XSOCK_PATHS_N];
     xsock_conn_s conns[XSOCK_CONNS_N];
 } xsock_host_s;
@@ -463,6 +465,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     xsock_host_s* const host = &hosts[hid];
     xsock_path_s* const path = &host->paths[pid];
 
+    unsigned long irqStatus;
+
+    write_lock_irqsave(&host->lock, irqStatus);
+
                  path->iActive = jiffies + path->iTimeout*HZ;
     if (unlikely(path->iHash != hash)) {
                  path->iHash =  hash;
@@ -484,6 +490,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
             _MAC(path->eSrc), _IP4(path->iAddrs[0]), BE16(wire->ports[1]),
             _MAC(path->eDst), _IP4(path->iAddrs[1]), BE16(path->cport));
 #endif
+        write_unlock_irqrestore(&host->lock, irqStatus);
     }
 #endif
 
@@ -793,6 +800,9 @@ static int __init xsock_init (void) {
         xsock_host_s* const host = &hosts[hid];
 #endif
         printk_host("INITIALIZING\n");
+
+        //
+        rwlock_init(&host->lock);
 
         // INITIALIZE CONNECTIONS
         foreach (cid, XSOCK_CONNS_N) {
