@@ -441,7 +441,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
          || wire->iFrag
          || wire->iProtocol != IPPROTO_UDP
 #if !XSOCK_SERVER // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
-         || wire->uDst != BE16(VPORT_SRV)
+         || wire->uDst != BE16(XSOCK_PORT)
 #endif
     )
         return RX_HANDLER_PASS;
