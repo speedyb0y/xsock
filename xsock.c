@@ -426,8 +426,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         printk("IN: DROP: NON LINEAR\n");
         goto drop;
     }
+    
+    xsock_orig_s* const orig = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
 
-    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
+    const xsock_wire_s* const wire = PTR(orig);
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS IPV4
@@ -477,7 +479,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // GET THE SIZE OF THE ENCAPSULATED PACKET
-    const uint ipSize = BE16(wire->iSize);
+    uint ipSize = BE16(wire->iSize);
 
     if (ipSize < sizeof(xsock_orig_s)) {
         printk("IN: DROP: SMALL\n");
@@ -542,14 +544,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
 
     // É TUDO MENOS O HASH
-    const uint origSize = ipSize - sizeof(wire->xHash);
-
-    xsock_orig_s* const orig = PTR(wire);
+    ipSize -= sizeof(wire->xHash);
 
     // RE-ENCAPSULATE
     orig->iVersion  = 0x45;
     orig->iTOS      = 0;
-    orig->iSize     = BE16(origSize);
+    orig->iSize     = BE16(ipSize);
     orig->iID       = 0;
     orig->iFrag     = 0;
     orig->iTTL      = 64;
@@ -575,11 +575,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     skb->mac_header      = PTR(&orig->iVersion) - SKB_HEAD(skb);
     skb->network_header  = PTR(&orig->iVersion) - SKB_HEAD(skb);
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
-    skb->tail            = PTR(&orig->iVersion) - SKB_HEAD(skb) + origSize;
+    skb->tail            = PTR(&orig->iVersion) - SKB_HEAD(skb) + ipSize;
 #else
-    skb->tail            = PTR(&orig->iVersion) + origSize;
+    skb->tail            = PTR(&orig->iVersion) + ipSize;
 #endif
-    skb->len             = origSize;
+    skb->len             = ipSize;
     skb->mac_len         = 0;
     skb->ip_summed       = CHECKSUM_UNNECESSARY;
     skb->csum_valid      = 1;
@@ -611,7 +611,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 
-    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
+    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_orig_s, iVersion);
 
     if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
         printk("OUT: DROP: SKB START\n");
