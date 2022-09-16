@@ -721,7 +721,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     *(u64*)wire->iAddrs  =
     *(u64*)path->iAddrs;
     wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
-    
+
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
