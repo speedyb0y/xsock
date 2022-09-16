@@ -534,6 +534,10 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
+#if !XSOCK_SERVER
+#define hid XSOCK_HOST_ID
+#endif
+
 #if XSOCK_SERVER
 #define TRY_OK                   (3*XSOCK_PATHS_N)
 #define TRY_OK_EXCEEDS           (2*XSOCK_PATHS_N)
@@ -541,10 +545,6 @@ drop:
 #else
 #define TRY_OK                   (2*XSOCK_PATHS_N)
 #define TRY_OK_EXCEEDS           (1*XSOCK_PATHS_N)
-#endif
-
-#if !XSOCK_SERVER
-#define hid XSOCK_HOST_ID
 #endif
 
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
