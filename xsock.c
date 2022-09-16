@@ -61,10 +61,15 @@ typedef struct net_device_ops net_device_ops_s;
 
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_PORT        XCONF_XSOCK_PORT
-#define XSOCK_MARK        XCONF_XSOCK_MARK
 #define XSOCK_HOSTS_N     XCONF_XSOCK_HOSTS_N
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
 #define XSOCK_HOST_ID     XCONF_XSOCK_HOST_ID
+
+#define VADDR_SRV 0xC00000FFU // 192.0.0.255
+#define VADDR_CLT 0xC0000000U // 192.0.0.0
+
+#define VPORT_CLT 4000
+#define VPORT_SRV 2000
 
 #if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
 #error "BAD XSOCK_PORT"
@@ -96,9 +101,6 @@ typedef struct net_device_ops net_device_ops_s;
 
 // 0xFFFF + 1
 #define XSOCK_CONNS_N 65536
-
-#define ADDR_SRV 0xC00000FFU // 192.0.0.255
-#define ADDR_CLT 0xC0000000U // 192.0.0.0
 
 #if XSOCK_SERVER
 #define printk_host(msg, ...) printk("XSOCK: HOST: %u " msg, hid, ##__VA_ARGS__)
@@ -439,7 +441,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
          || wire->iFrag
          || wire->iProtocol != IPPROTO_UDP
 #if !XSOCK_SERVER // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
-         || wire->uDst != BE16(XSOCK_PORT)
+         || wire->uDst != BE16(VPORT_SRV)
 #endif
     )
         return RX_HANDLER_PASS;
@@ -555,14 +557,14 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     orig->iProtocol = IPPROTO_TCP;
     orig->iChecksum = 0;
 #if XSOCK_SERVER
-    orig->iSrc      = BE32(ADDR_CLT | hid);
-    orig->iDst      = BE32(ADDR_SRV);
+    orig->iSrc      = BE32(VADDR_CLT + hid);
+    orig->iDst      = BE32(VADDR_SRV);
     orig->tSrc      = BE16(cid);
-    orig->tDst      = BE16(XSOCK_PORT);
+    orig->tDst      = BE16(VPORT_CLT);
 #else
-    orig->iSrc      = BE32(ADDR_SRV);
-    orig->iDst      = BE32(ADDR_CLT | XSOCK_HOST_ID);
-    orig->tSrc      = BE16(XSOCK_PORT);
+    orig->iSrc      = BE32(VADDR_SRV);
+    orig->iDst      = BE32(VADDR_CLT + XSOCK_HOST_ID);
+    orig->tSrc      = BE16(VPORT_CLT);
     orig->tDst      = BE16(cid);
 #endif
     orig->tSeq      = orig->tSeq2;
@@ -632,12 +634,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     if (orig->iVersion != 0x45
      || orig->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
-     || orig->iSrc != BE32(ADDR_SRV)
-     || orig->tSrc != BE16(XSOCK_PORT)
+     || orig->iSrc != BE32(VADDR_SRV)
+     || orig->tSrc != BE16(VPORT_SRV)
 #else
-     || orig->iSrc != BE32(ADDR_CLT | XSOCK_HOST_ID)
-     || orig->iDst != BE32(ADDR_SRV)
-     || orig->tDst != BE16(XSOCK_PORT)
+     || orig->iSrc != BE32(VADDR_CLT | XSOCK_HOST_ID)
+     || orig->iDst != BE32(VADDR_SRV)
+     || orig->tDst != BE16(VPORT_SRV)
 #endif
     ) {
         printk("OUT: DROP: BAD PACKET\n");
@@ -777,7 +779,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     wire->uDst        = path->uDst; // THE CLIENT IS BEHIND NAT
 #else
     wire->uSrc        = BE16(XSOCK_PORT);
-    wire->uDst        = BE16(PORT(XSOCK_HOST_ID, pid));
+    wire->uDst        = BE16(PORT(hid, pid));
 #endif
     wire->uSize       = BE16(ipSize - 20);
     wire->uChecksum   = 0;
