@@ -134,7 +134,7 @@ typedef struct net_device_ops net_device_ops_s;
 #define WIRE_HASH(wire, ipSizeOrig) \
     ((wire_hash_t*)(WIRE_IP(wire) + (ipSizeOrig)))
 
-typedef u32 wire_hash_t;
+typedef u64 wire_hash_t;
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE 56
@@ -441,7 +441,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // DECRYPT AND CONFIRM AUTHENTICITY
     if (xsock_in_decrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 28)
-        != BE32(*WIRE_HASH(wire, ipSize))) {
+        != BE64(*WIRE_HASH(wire, ipSize))) {
         printk("IN: DROP: BAD HASH\n");
         goto drop;
     }
@@ -626,7 +626,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // ENCODE ANTES DO SPINLOCK
     *WIRE_HASH(wire, ipSize - sizeof(wire_hash_t))
-        = BE32(xsock_out_encrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 20 - 8 - sizeof(wire_hash_t)));
+        = BE64(xsock_out_encrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 20 - 8 - sizeof(wire_hash_t)));
 
     spin_lock_irq(&host->lock);
 
