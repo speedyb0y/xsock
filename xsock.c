@@ -595,10 +595,6 @@ drop:
     return RX_HANDLER_CONSUMED;
 }
 
-#if !XSOCK_SERVER
-#define hid XSOCK_HOST_ID
-#endif
-
 #if XSOCK_SERVER
 #define TRY_OK                   (3*XSOCK_PATHS_N)
 #define TRY_OK_EXCEEDS           (2*XSOCK_PATHS_N)
@@ -629,14 +625,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 
-    // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
+    // DON'T ALLOW INTERFERENCE FROM IP OPTIONS, IPV6, ICMP, WRONG ADDRESSES/PORTS
     if (orig->iVersion != 0x45
      || orig->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
      || orig->iSrc != BE32(VADDR_SRV)
      || orig->tSrc != BE16(VPORT_SRV)
 #else
-     || orig->iSrc != BE32(VADDR_CLT + hid)
+     || orig->iSrc != BE32(VADDR_CLT + XSOCK_HOST_ID)
      || orig->iDst != BE32(VADDR_SRV)
      || orig->tDst != BE16(VPORT_SRV)
 #endif
@@ -647,22 +643,25 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
 #if XSOCK_SERVER
     const uint hid = BE32(orig->iDst) - VADDR_CLT;
+    const uint cid = BE16(orig->tDst);
+#else
+    const uint hid = XSOCK_HOST_ID;
+    const uint cid = BE16(orig->tSrc);
+#endif
 
+#if XSOCK_SERVER
     if (hid >= XSOCK_HOSTS_N) {
         printk("OUT: DROP: BAD HID\n");
         goto drop;
     }
-
-    xsock_host_s* const host = &hosts[hid];
-
-    const uint cid = BE16(orig->tDst);
-#else
-    const uint cid = BE16(orig->tSrc);
 #endif
 
-    spin_lock_irq(&host->lock);
-
+#if XSOCK_SERVER
+    xsock_host_s* const host = &hosts[hid];
+#endif
     xsock_conn_s* const conn = &host->conns[cid];
+
+    spin_lock_irq(&host->lock);
 
     const uint now = ((u64)jiffies) & XSOCK_CONN_BURST_MASK;
 
