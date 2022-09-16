@@ -216,13 +216,13 @@ typedef struct xsock_path_s {
     u32 oLast; // ULTIMA VEZ QUE ENVIOU - ENTAO DE LA ATE NOW PASSARAM-SE N DIFFIES
     u32 oRemaining;
     u32 oPkts;
-#if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
     u16 uDst;
+#if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
     u16 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
     u64 iActive; //  [IN LAST]  ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
 #else
-    u32 reserved0;
+    u16 reserved0;
     u64 reserved1;
     u64 reserved2;
 #endif
@@ -757,11 +757,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
-    wire->iSrc        = path->iSrc;
-    wire->iDst        = path->iDst;
-#if XSOCK_SERVER
-    wire->uDst        = path->uDst; // THE CLIENT IS BEHIND NAT
-#endif
+    wire->iSrc = path->iSrc;
+    wire->iDst = path->iDst;
+    wire->uDst = path->uDst;
 
     // REMEMBER AFTER UNLOCKING
     net_device_s* const itfc = path->itfc;
