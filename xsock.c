@@ -579,7 +579,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
 
     xsock_host_s* const host = &hosts[hid];
+#endif
 
+    unsigned long irqStatus;
+
+    write_lock_irqsave(&host->lock, irqStatus);
+
+#if XSOCK_SERVER
     const uint cid = BE16(wire->ports[1]);
 #else
     const uint cid = BE16(wire->ports[0]);
@@ -651,7 +657,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         // PATH INUSABLE
         if (!--c)
             // NENHUM PATH DISPONÍVEL
-            goto drop;
+            goto drop_unlock;
 
         // GO TO NEXT PATH
         pid++;
@@ -698,6 +704,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = path->itfc;
 
+    write_unlock_irqrestore(&host->lock, irqStatus);
+
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
     // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
@@ -705,6 +713,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     return NETDEV_TX_OK;
 
+drop_unlock:
+    write_unlock_irqrestore(&host->lock, irqStatus);
 drop:
     printk("OUT: DROP\n");
 
