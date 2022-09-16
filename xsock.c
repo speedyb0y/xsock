@@ -128,6 +128,8 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_TCP_FLAGS_FIN 0b0000000100000000U
 #endif
 
+#define ORIG_IP(orig) PTR(&(orig)->iVersion)
+
 #define WIRE_ETH(wire)     PTR(&(wire)->eDst)
 #define WIRE_IP(wire)      PTR(&(wire)->iVersion)
 #define WIRE_UDP(wire)     PTR(&(wire)->uSrc)
@@ -611,7 +613,12 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 
-    const xsock_orig_s* const orig = SKB_DATA(skb);
+    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
+
+    if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
+        printk("OUT: DROP: SKB START\n");
+        goto drop_unlock;
+    }
 
     uint ipSize = skb->len;
 
@@ -620,7 +627,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 
-    if (PTR(orig) + ipSize > SKB_END(skb)) {
+    // AMBOS TEM O MESMO TAMANHO
+    const xsock_orig_s* const orig = PTR(wire);
+
+    if (ORIG_IP(orig) + ipSize > SKB_END(skb)) {
         printk("OUT: DROP: INCOMPLETE\n");
         goto drop;
     }
@@ -744,21 +754,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
 
-    // REMEMBER AFTER UNLOCKING
-    net_device_s* const itfc = path->itfc;
-
-    // AMBOS COMPARTILHAM O MESMO FIM
-    // ENTAO VAI PARA O FIM DE UM, DEPOIS VOLTA PARA O COMEÇO DO OUTRO
-    xsock_wire_s* const wire = PTR(orig)
-        + sizeof(xsock_orig_s)
-        - sizeof(xsock_wire_s);
-
-    //
-    if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
-        printk("OUT: DROP: SKB START\n");
-        goto drop_unlock;
-    }
-
     // RE-ENCAPSULATE
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
@@ -768,6 +763,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #if XSOCK_SERVER
     wire->uDst        = path->uDst; // THE CLIENT IS BEHIND NAT
 #endif
+
+    // REMEMBER AFTER UNLOCKING
+    net_device_s* const itfc = path->itfc;
 
     spin_unlock_irq(&host->lock);
 
