@@ -316,6 +316,7 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
         size -= sizeof(u64);
     }
 
+#if 0
     while (size) {
         const u8 orig = *(u8*)data;
         u64 value = orig;
@@ -328,6 +329,7 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
         data += sizeof(u8);
         size -= sizeof(u8);
     }
+#endif
 
     a += b;
     a += a >> 32;
@@ -353,6 +355,7 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint siz
         size -= sizeof(u64);
     }
 
+#if 0
     while (size) {
         u64 orig = *(u8*)data;
         orig -= swap64(b, size);
@@ -364,6 +367,7 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint siz
         data += sizeof(u8);
         size -= sizeof(u8);
     }
+#endif
 
     a += b;
     a += a >> 32;
