@@ -171,7 +171,7 @@ typedef struct xsock_wire_s {
     u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u32 tSeq; // tChecksum, tUrgent
+    u32 tSeq2;
 // TCP PAYLOAD
 } xsock_wire_s;
 
@@ -202,8 +202,7 @@ typedef struct xsock_orig_s {
     u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u16 tChecksum;
-    u16 tUrgent;
+    u32 tSeq2; // CHECKSUM, URGENT
 // TCP PAYLOAD
 } xsock_orig_s;
 
@@ -548,11 +547,11 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // RE-ENCAPSULATE
     orig->iVersion  = 0x45;
     orig->iTOS      = 0;
-    orig->iID       = 0;
+    orig->iSize     = BE16(origSize);
+    orig->iCID      = 0;
     orig->iFrag     = 0;
     orig->iTTL      = 64;
     orig->iProtocol = IPPROTO_TCP;
-    orig->iSize     = BE16(origSize);
     orig->iChecksum = 0;
 #if XSOCK_SERVER
     orig->iSrc      = BE32(ADDR_CLT | hid);
