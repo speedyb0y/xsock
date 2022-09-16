@@ -558,6 +558,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     const uint ipSize = skb->len + sizeof(wire_hash_t);
 
+    if (ipSize < (20 + 20 + sizeof(wire_hash_t))) {
+        printk("OUT: DROP: TOO SMALL: IP SIZE %u\n", ipSize);
+        goto drop;
+    }
+
     // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
     if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
         printk("OUT: DROP: SKB START\n");
