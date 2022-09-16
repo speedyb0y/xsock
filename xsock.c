@@ -126,15 +126,15 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_WIRE_TCP_FIN 0b0000000100000000U
 #endif
 
-#define WIRE_ETH(wire)         PTR(&(wire)->eDst)
-#define WIRE_IP(wire)          PTR(&(wire)->iVersionTOS)
-#define WIRE_UDP(wire)         PTR(&(wire)->ports)
-#define WIRE_PAYLOAD(wire)     PTR(&(wire)->uPayload)
+#define WIRE_ETH(wire)     PTR(&(wire)->eDst)
+#define WIRE_IP(wire)      PTR(&(wire)->iVersion)
+#define WIRE_UDP(wire)     PTR(&(wire)->uSrc)
+#define WIRE_PAYLOAD(wire) PTR(&(wire)->tFlags)
 
-#define WIRE_HASH(wire, ipSizeOrig) \
-    ((wire_hash_t*)(WIRE_IP(wire) + (ipSizeOrig)))
-
-typedef u64 wire_hash_t;
+#define WIRE_PAYLOAD_SIZE(ipSize) (ipSize - ( \
+	offsetof(xsock_wire_s, iVersion) \
+  - offsetof(xsock_wire_s, tFlags) \
+	))
 
 // EXPECTED SIZE
 #define XSOCK_WIRE_SIZE 56
@@ -144,30 +144,48 @@ typedef struct xsock_wire_s {
     u16 eDst[ETH_ALEN/sizeof(u16)];
     u16 eSrc[ETH_ALEN/sizeof(u16)];
     u16 eType;
-    u16 iVersionTOS;
+    u8  iVersion;
+    u8  iTOS;
     u16 iSize;
     u16 iCID; // CONNECTION ID (CLIENT SOURCE (EPHEMERAL) PORT)
     u16 iFrag;
     u8  iTTL;
     u8  iProtocol;
     u16 iChecksum;
-    u32 iAddrs[2];
-    u16 ports[2];
-    union {
-        struct { // AS ORIGINAL TCP
-            u32 tSeq;
-            u32 tAck;
-            u16 tFlags;
-            u16 tWindow;
-            u32 tSeq2; // CHECKSUM & URGENT
-        };
-        struct { // AS FAKE UDP
-            u16 uSize;
-            u16 uChecksum;
-            u16 uPayload[6];
-        };
-    };
+    u32 iSrc;
+    u32 iDst;
+    u16 uSrc;
+    u16 uDst;
+    u16 uSize;     // tSeq
+    u16 uChecksum; // tSeq
+    u32 xHash;     // tAck
+    u16 tFlags;
+    u16 tWindow;
+    u32 tSeq2;     // tChecksum, tUrgent
 } xsock_wire_s;
+
+#define XSOCK_ORIG_SIZE 40
+
+typedef struct xsock_orig_s {
+    u8  iVersion;
+    u8  iTOS;
+    u16 iSize;
+    u16 iID;
+    u16 iFrag;
+    u8  iTTL;
+    u8  iProtocol;
+    u16 iChecksum;
+    u32 iSrc;
+    u32 iDst;
+    u16 tSrc;
+    u16 tDst;
+    u32 tSeq;
+    u32 tAck;
+    u16 tFlags;
+    u16 tWindow;
+    u16 tChecksum;
+    u16 tUrgent;
+} xsock_orig_s;
 
 // EXPECTED SIZE
 #define XSOCK_PATH_SIZE CACHE_LINE_SIZE
@@ -178,7 +196,7 @@ typedef struct xsock_path_s {
     u32 oRemaining;
     u32 oPkts;
 #if XSOCK_SERVER // TODO: FIXME: NO CLIENTE USAR ISSO TAMBÉM, MAS DE TEMPOS EM TEMPOS TENTAR RESTAURAR, E COM VALORES MENORES DE PKTS E TIME
-    u16 cport;
+    u16 uDst;
     u16 iTimeout; // MÁXIMO DE TEMPO (EM SEGUNDOS) QUE PODE FICAR SEM RECEBER NADA E AINDA ASSIM CONSIDERAR COMO FUNCIONANDO
     u64 iActive; //  [IN LAST]  ATÉ ESTE TIME (EM JIFFIES), CONSIDERA QUE A CONEXÃO ESTÁ ATIVA
     u64 iHash; // THE PATH HASH
@@ -190,8 +208,10 @@ typedef struct xsock_path_s {
     u16 eDst[ETH_ALEN/sizeof(u16)];
     u16 eSrc[ETH_ALEN/sizeof(u16)];
     u16 eType;
-    u16 iVersionTOS;
-    u32 iAddrs[2];
+    u8  iVersion;
+    u8  iTOS;
+    u32 iSrc;
+    u32 iDst;
 } xsock_path_s;
 
 #define O_PKTS_SHIFT 11
@@ -298,7 +318,7 @@ static inline u64 unswap64 (u64 x, const u64 mask) {
 #define A 0xE04EC65E50E04E0EULL
 #define B 0x8A489FE74E0FE1E4ULL
 
-static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint size) {
+static u32 xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint size) {
 
     a += A + swap64(b, size);
     b += B + swap64(a, size);
@@ -330,13 +350,13 @@ static wire_hash_t xsock_out_encrypt (u64 a, u64 b, void* restrict data, uint si
     }
 
     a += b;
-    //a += a >> 32;
-    //a &= 0xFFFFFFFFULL;
+    a += a >> 32;
+    a &= 0xFFFFFFFFULL;
 
-    return (wire_hash_t)a;
+    return (u32)a;
 }
 
-static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
+static u32 xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint size) {
 
     a += A + swap64(b, size);
     b += B + swap64(a, size);
@@ -366,10 +386,10 @@ static wire_hash_t xsock_in_decrypt (u64 a, u64 b, void* restrict data, uint siz
     }
 
     a += b;
-    //a += a >> 32;
-    //a &= 0xFFFFFFFFULL;
+    a += a >> 32;
+    a &= 0xFFFFFFFFULL;
 
-    return (wire_hash_t)a;
+    return (u32)a;
 }
 
 // TODO: FIXME: PROTECT THE REAL SERVER TCP PORTS SO WE DON'T NEED TO BIND TO THE FAKE INTERFACE
@@ -385,7 +405,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
     }
 
-    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
+    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
 
     // CONFIRM PACKET SIZE
     // CONFIRM THIS IS ETHERNET/IPV4/UDP
@@ -397,10 +417,10 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         return RX_HANDLER_PASS;
 
 #if XSOCK_SERVER
-    const uint srvPort = BE16(wire->ports[1]);
+    const uint srvPort = BE16(wire->uDst);
 #else
-    const uint srvPort = BE16(wire->ports[0]);
-    const uint cltPort = BE16(wire->ports[1]);
+    const uint srvPort = BE16(wire->uSrc);
+    const uint cltPort = BE16(wire->uDst);
 #endif
 
     // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
@@ -431,17 +451,18 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
 
     // GET THE SIZE OF THE ORIGINAL PACKET
-    const uint ipSize = BE16(wire->iSize) - sizeof(wire_hash_t);
+    const uint ipSize = BE16(wire->iSize);
 
     // DROP INCOMPLETE PACKETS
-    if ((WIRE_IP(wire) + ipSize + sizeof(wire_hash_t)) > SKB_TAIL(skb)) {
+    if ((WIRE_IP(wire) + ipSize) > SKB_TAIL(skb)) {
         printk("IN: DROP: INCOMPLETE\n");
         goto drop;
     }
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (xsock_in_decrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 28)
-        != BE64(*WIRE_HASH(wire, ipSize))) {
+    if (wire->xHash != BE32(xsock_in_decrypt(hid, cid,
+		WIRE_PAYLOAD(wire),
+		WIRE_PAYLOAD_SIZE(ipSize)))) {
         printk("IN: DROP: BAD HASH\n");
         goto drop;
     }
@@ -451,8 +472,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const u64 hash = (u64)(uintptr_t)skb->dev
       + *(u64*)wire->eDst // VAI PEGAR UM PEDAÇO DO eSrc
       + *(u64*)wire->eSrc // VAI PEGAR O eType
-      + *(u64*)wire->iAddrs // VAI PEGAR O iDst
-      + *(u32*)wire->ports // VAI PEGAR AMBAS AS PORTAS MAS O SERVER PORT É FIXO PARA ESTE HOST:PATH
+     + *(u64*)&wire->iSrc // VAI PEGAR O iDst
+     + *(u32*)&wire->uSrc // VAI PEGAR AMBAS AS PORTAS MAS O SERVER PORT É FIXO PARA ESTE HOST:PATH
     ;
 
     xsock_host_s* const host = &hosts[hid];
@@ -464,24 +485,24 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     if (unlikely(path->iHash != hash)) {
 
-        path->iHash     = hash;
-        path->itfc      = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
-        path->eDst[0]   = wire->eSrc[0];
-        path->eDst[1]   = wire->eSrc[1];
-        path->eDst[2]   = wire->eSrc[2];
-        path->eSrc[0]   = wire->eDst[0];
-        path->eSrc[1]   = wire->eDst[1];
-        path->eSrc[2]   = wire->eDst[2];
-        path->iAddrs[1] = wire->iAddrs[0];
-        path->iAddrs[0] = wire->iAddrs[1];
-        path->cport     = wire->ports[0];
+        path->iHash   = hash;
+        path->itfc    = skb->dev; // NOTE: SE CHEGOU ATÉ AQUI ENTÃO É UMA INTERFACE JÁ HOOKADA
+        path->eDst[0] = wire->eSrc[0];
+        path->eDst[1] = wire->eSrc[1];
+        path->eDst[2] = wire->eSrc[2];
+        path->eSrc[0] = wire->eDst[0];
+        path->eSrc[1] = wire->eDst[1];
+        path->eSrc[2] = wire->eDst[2];
+        path->iDst    = wire->iSrc;
+        path->iSrc    = wire->iDst;
+        path->uDst    = wire->uSrc;
 
         printk_host("PATH %u: UPDATED WITH HASH 0x%016llX ITFC %s"
             " 0x%04X%04X%04X 0x%08X %u ->"
             " 0x%04X%04X%04X 0x%08X %u\n",
             pid, (uintll)path->iHash, path->itfc->name,
-            _MAC(path->eSrc), _IP4(path->iAddrs[0]), BE16(wire->ports[1]),
-            _MAC(path->eDst), _IP4(path->iAddrs[1]), BE16(path->cport));
+            _MAC(path->eSrc), _IP4(path->iSrc), BE16(wire->uDst),
+            _MAC(path->eDst), _IP4(path->iDst), BE16(path->uDst));
     }
 
     path->iActive = jiffies + path->iTimeout*HZ;
@@ -489,36 +510,49 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     spin_unlock_irqrestore(&host->lock, irqStatus);
 #endif
 
+    // É TUDO MENOS O HASH
+    const uint origSize = ipSize - sizeof(u32);
+
+    xsock_orig_s* const orig = WIRE_IP(wire) + sizeof(u32);
+
     // RE-ENCAPSULATE
+    orig->iVersion  = 0x45;
+    orig->iTOS      = 0;
+    orig->iID       = 0;
+    orig->iFrag     = 0;
+    orig->iTTL      = 64;
+    orig->iProtocol = IPPROTO_TCP;
+    orig->iSize     = BE16(origSize);
+    orig->iChecksum = 0;
 #if XSOCK_SERVER
-    wire->iAddrs[0] = BE32(ADDR_CLT | hid);
-    wire->iAddrs[1] = BE32(ADDR_SRV);
-    wire-> ports[0] = BE16(cid);
-    wire-> ports[1] = BE16(XSOCK_PORT);
+    orig->iSrc      = BE32(ADDR_CLT | hid);
+    orig->iDst      = BE32(ADDR_SRV);
+    orig->tSrc      = BE16(cid);
+    orig->tDst      = BE16(XSOCK_PORT);
 #else
-    wire->iAddrs[0] = BE32(ADDR_SRV);
-    wire->iAddrs[1] = BE32(ADDR_CLT | XSOCK_HOST_ID);
-    wire-> ports[0] = BE16(XSOCK_PORT);
-    wire-> ports[1] = BE16(cid);
+    orig->iSrc      = BE32(ADDR_SRV);
+    orig->iDst      = BE32(ADDR_CLT | XSOCK_HOST_ID);
+    orig->tSrc      = BE16(XSOCK_PORT);
+    orig->tDst      = BE16(cid);
 #endif
-    wire->iTTL      = 64;
-    wire->iProtocol = IPPROTO_TCP;
-    wire->iSize     = BE16(ipSize);
-    wire->iChecksum = 0;
-    wire->iChecksum = ip_fast_csum(WIRE_IP(wire), 5);
-    wire->tSeq      = wire->tSeq2;
-    wire->tSeq2     = 0;
+    orig->tSeq      = wire->tSeq2;
+ // orig->tAck
+ // orig->tFlags
+ // orig->tWindow
+    orig->tChecksum = 0;
+    orig->tUrgent   = 0;
+    orig->iChecksum = ip_fast_csum(PTR(orig), 5);
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
-    skb->data            = WIRE_IP(wire);
-    skb->mac_header      = WIRE_IP(wire) - SKB_HEAD(skb);
-    skb->network_header  = WIRE_IP(wire) - SKB_HEAD(skb);
+    skb->data            = PTR(orig);
+    skb->mac_header      = PTR(orig) - SKB_HEAD(skb);
+    skb->network_header  = PTR(orig) - SKB_HEAD(skb);
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
-    skb->tail            = WIRE_IP(wire) - SKB_HEAD(skb) + ipSize;
+    skb->tail            = PTR(orig) - SKB_HEAD(skb) + origSize;
 #else
-    skb->tail            = WIRE_IP(wire) + ipSize;
+    skb->tail            = PTR(orig) + origSize;
 #endif
-    skb->len             = ipSize;
+    skb->len             = origSize;
     skb->mac_len         = 0;
     skb->ip_summed       = CHECKSUM_UNNECESSARY;
     skb->csum_valid      = 1;
@@ -549,66 +583,54 @@ drop:
 
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
-    if (skb->protocol != BE16(ETH_P_IP)) {
-        printk("OUT: DROP: NOT IPV4\n");
-        goto drop;
-    }
-
     if (skb_linearize(skb)) {
         printk("OUT: DROP: NON LINEAR\n");
         goto drop;
     }
 
-    xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
+    xsock_orig_s* const orig = SKB_DATA(skb);
 
-    const uint ipSize = skb->len + sizeof(wire_hash_t);
+    const uint origSize = skb->len;
 
-    if (ipSize < (20 + 20 + sizeof(wire_hash_t))) {
-        printk("OUT: DROP: TOO SMALL: IP SIZE %u\n", ipSize);
+    if (origSize < sizeof(xsock_orig_s)) {
+        printk("OUT: DROP: TOO SMALL\n");
         goto drop;
     }
 
-    // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
-    if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
+    if (PTR(orig) + origSize > SKB_END(skb)) {
+        printk("OUT: DROP: SKB END\n");
+        goto drop;
+    }
+
+    //
+    xsock_wire_s* const wire = PTR(orig)
+        + sizeof(xsock_orig_s)
+        - sizeof(xsock_wire_s);
+
+    //
+    if (PTR(wire) < SKB_HEAD(skb)) {
         printk("OUT: DROP: SKB START\n");
         goto drop;
     }
 
-    if (WIRE_IP(wire) + ipSize > SKB_END(skb)) {
-        printk("OUT: DROP: SKB END: WIRE_IP(wire) %llu + ipSize %llu > SKB_END(skb) %llu\n",
-            (uintll)WIRE_IP(wire),
-            (uintll)ipSize,
-            (uintll)SKB_END(skb));
-        goto drop;
-    }
-
-    if (wire->iSize != BE16(skb->len)) {
-        printk("OUT: DROP: wire->iSize %u != skb->len %u\n",
-            wire->iSize, skb->len);
-        goto drop;
-    }
-
-    if (wire->iProtocol != IPPROTO_TCP) {
-        printk("OUT: DROP: NOT TCP\n");
-        goto drop;
-    }
-
-    if (0
+    // DON'T ALLOW INTERFERENCE FROM IPV6, ICMP, WRONG ADDRESSES/PORTS
+    if (orig->iVersion != 0x45
+     || orig->iProtocol != IPPROTO_TCP
 #if XSOCK_SERVER
-      || wire->iAddrs[0] != BE32(ADDR_SRV)
-      || wire-> ports[0] != BE16(XSOCK_PORT)
+     || orig->iSrc != BE32(ADDR_SRV)
+     || orig->tSrc != BE16(XSOCK_PORT)
 #else
-      || wire->iAddrs[0] != BE32(ADDR_CLT | XSOCK_HOST_ID)
-      || wire->iAddrs[1] != BE32(ADDR_SRV)
-      || wire-> ports[1] != BE16(XSOCK_PORT)
+     || orig->iSrc != BE32(ADDR_CLT | XSOCK_HOST_ID)
+     || orig->iDst != BE32(ADDR_SRV)
+     || orig->tDst != BE16(XSOCK_PORT)
 #endif
     ) {
-        printk("OUT: DROP: crazy\n");
+        printk("OUT: DROP: BAD PACKET\n");
         goto drop;
     }
 
 #if XSOCK_SERVER
-    const uint hid = BE32(wire->iAddrs[1]) & 0xFF;
+    const uint hid = BE32(orig->iDst) & 0xFF;
 
     if (hid >= XSOCK_HOSTS_N) {
         printk("OUT: DROP: BAD HID\n");
@@ -617,26 +639,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     xsock_host_s* const host = &hosts[hid];
 
-    const uint cid = BE16(wire->ports[1]);
+    const uint cid = BE16(orig->tDst);
 #else
-    const uint cid = BE16(wire->ports[0]);
+    const uint cid = BE16(orig->tSrc);
 #endif
-
-    // SALVA ANTES DE SOBRESCREVER
-    wire->tSeq2       = wire->tSeq;
-    // ENCAPSULA ANTES DO SPINLOCK
-    wire->uSize       = BE16(ipSize - 20);
-    wire->uChecksum   = 0;
-    wire->iCID        = BE16(cid);
-    wire->iSize       = BE16(ipSize);
-    wire->iFrag       = 0;
-    wire->iTTL        = 64;
-    wire->iProtocol   = IPPROTO_UDP;
-    wire->iChecksum   = 0;
-
-    // ENCODE ANTES DO SPINLOCK
-    *WIRE_HASH(wire, ipSize - sizeof(wire_hash_t))
-        = BE64(xsock_out_encrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 20 - 8 - sizeof(wire_hash_t)));
 
     spin_lock_irq(&host->lock);
 
@@ -648,7 +654,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     //      -- TO ALLOW SERVER TO DISCOVER THEM
     //      -- TO ENFORCE A SUCCESSFULL RETRANSMISSION ON HANDSHAKE/FINALIZATION
     // NOTE: ENQUANTO RETRANSMITIR O SYN/SYN-ACK/FIN/RST, VAI FICAR RESETANDO ISSO
-    const uint cdown = wire->tFlags & (
+    const uint cdown = orig->tFlags & (
             XSOCK_WIRE_TCP_SYN |
             XSOCK_WIRE_TCP_RST |
             XSOCK_WIRE_TCP_FIN
@@ -720,20 +726,46 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
 
-    // RE-ENCAPSULATE
-#if XSOCK_SERVER
-    wire->ports[0]    = BE16(PORT(hid, pid));
-    wire->ports[1]    = path->cport; // THE CLIENT IS BEHIND NAT
-#else
-    wire->ports[0]    = BE16(XSOCK_PORT);
-    wire->ports[1]    = BE16(PORT(XSOCK_HOST_ID, pid));
-#endif
-    *(u64*)wire->iAddrs  =
-    *(u64*)path->iAddrs;
-    wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
+    //
+    net_device_s* const itfc = path->itfc;
 
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
+
+	//
+	const uint ipSize = origSize + sizeof(u32);
+
+    // MOVE ANTES DE SOBRESCREVER
+    wire->tSeq2       = orig->tSeq;
+    // RE-ENCAPSULATE
+ // wire->iVersion
+ // wire->iTOS
+    wire->iCID        = BE16(cid);
+    wire->iSize       = BE16(ipSize);
+    wire->iFrag       = 0;
+    wire->iTTL        = 64;
+    wire->iProtocol   = IPPROTO_UDP;
+    wire->iChecksum   = 0;
+    wire->iSrc        = path->iSrc;
+    wire->iDst        = path->iDst;
+#if XSOCK_SERVER
+    wire->uSrc        = BE16(PORT(hid, pid));
+    wire->uDst        = path->uDst; // THE CLIENT IS BEHIND NAT
+#else
+    wire->uSrc        = BE16(XSOCK_PORT);
+    wire->uDst        = BE16(PORT(XSOCK_HOST_ID, pid));
+#endif
+    wire->uSize       = BE16(ipSize - 20);
+    wire->uChecksum   = 0;
+    wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
+
+    spin_unlock_irq(&host->lock);
+
+    // ENCODE
+    wire->xHash = BE32(xsock_out_encrypt(hid, cid,
+		WIRE_PAYLOAD(wire),
+		WIRE_PAYLOAD_SIZE(ipSize)
+		));
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - SKB_HEAD(skb);
@@ -747,9 +779,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->mac_len          = ETH_HLEN;
     skb->len              = ETH_HLEN + ipSize;
     skb->ip_summed        = CHECKSUM_NONE;
-    skb->dev              = path->itfc;
-
-    spin_unlock_irq(&host->lock);
+    skb->dev              = itfc;
 
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
@@ -796,10 +826,10 @@ static void xsock_setup (net_device_s* const dev) {
     dev->header_ops      = NULL;
     dev->type            = ARPHRD_NONE;
     dev->addr_len        = 0;
-    dev->hard_header_len = offsetof(xsock_wire_s, iVersionTOS);
-    dev->min_header_len  = offsetof(xsock_wire_s, iVersionTOS);
-    dev->needed_headroom = 512; // ???
-    dev->needed_tailroom = 512;
+    dev->hard_header_len = sizeof(xsock_wire_s);
+    dev->min_header_len  = sizeof(xsock_wire_s);
+    //dev->needed_headroom = ;
+    //dev->needed_tailroom = ;
     dev->min_mtu         = ETH_MAX_MTU;
     dev->max_mtu         = ETH_MAX_MTU;
     dev->mtu             = ETH_MAX_MTU;
@@ -818,6 +848,7 @@ static void xsock_setup (net_device_s* const dev) {
 
 static int __init xsock_init (void) {
 
+    BUILD_BUG_ON(sizeof(xsock_orig_s) != XSOCK_ORIG_SIZE);
     BUILD_BUG_ON(sizeof(xsock_wire_s) != XSOCK_WIRE_SIZE);
     BUILD_BUG_ON(sizeof(xsock_path_s) != XSOCK_PATH_SIZE);
     BUILD_BUG_ON(sizeof(xsock_conn_s) != XSOCK_CONN_SIZE);
@@ -908,7 +939,7 @@ static int __init xsock_init (void) {
          // path->oRemaining --> 0
             path->oPkts     = oPkts;
 #if XSOCK_SERVER
-         // path->cport     --> 0
+         // path->uDst     --> 0
             path->iTimeout  = this->iTimeout;
          // path->iActive   --> 0
          // path->iHash     --> 0
@@ -917,16 +948,17 @@ static int __init xsock_init (void) {
          // path->reserved1 --> 0
          // path->reserved2 --> 0
 #endif
-            path->eDst[0]     = this->eDst[0];
-            path->eDst[1]     = this->eDst[1];
-            path->eDst[2]     = this->eDst[2];
-            path->eSrc[0]     = this->eSrc[0];
-            path->eSrc[1]     = this->eSrc[1];
-            path->eSrc[2]     = this->eSrc[2];
-            path->eType       = BE16(ETH_P_IP);
-            path->iVersionTOS = BE16(0x4500U);
-            path->iAddrs[0]   = this->addr32;
-            path->iAddrs[1]   = peer->addr32;
+            path->eDst[0]    = this->eDst[0];
+            path->eDst[1]    = this->eDst[1];
+            path->eDst[2]    = this->eDst[2];
+            path->eSrc[0]    = this->eSrc[0];
+            path->eSrc[1]    = this->eSrc[1];
+            path->eSrc[2]    = this->eSrc[2];
+            path->eType      = BE16(ETH_P_IP);
+            path->iVersion   = 0x45;
+            path->iTOS       = 0;
+            path->iSrc       = this->addr32;
+            path->iDst       = peer->addr32;
 
             net_device_s* const itfc = dev_get_by_name(&init_net, this->itfc);
 
@@ -941,10 +973,10 @@ static int __init xsock_init (void) {
                     // NOT HOOKED YET
                     if (!netdev_rx_handler_register(itfc, xsock_in, NULL)) {
                         // HOOK SUCCESS
-    itfc->hard_header_len += offsetof(xsock_wire_s, iVersionTOS);
-    itfc->min_header_len  += offsetof(xsock_wire_s, iVersionTOS);
-    itfc->needed_headroom += 64; // ???
-    itfc->needed_tailroom += 64;
+    //////////itfc->hard_header_len += offsetof(xsock_wire_s, iVersionTOS);
+    //////////itfc->min_header_len  += offsetof(xsock_wire_s, iVersionTOS);
+    //////////itfc->needed_headroom += 64; // ???
+    //////////itfc->needed_tailroom += 64;
                         //itfc->usage = 1;
                         path->itfc = itfc;
                     }
@@ -999,10 +1031,10 @@ static void __exit xsock_exit (void) {
 
                 if (rcu_dereference(itfc->rx_handler) == xsock_in) {
                     netdev_rx_handler_unregister(itfc);
-    itfc->hard_header_len -= offsetof(xsock_wire_s, iVersionTOS);
-    itfc->min_header_len  -= offsetof(xsock_wire_s, iVersionTOS);
-    itfc->needed_headroom -= 64; // ???
-    itfc->needed_tailroom -= 64;
+    //////////////itfc->hard_header_len -= offsetof(xsock_wire_s, iVersionTOS);
+    //////////////itfc->min_header_len  -= offsetof(xsock_wire_s, iVersionTOS);
+    //////////////itfc->needed_headroom -= 64; // ???
+    //////////////itfc->needed_tailroom -= 64;
                 }
 
                 rtnl_unlock();
