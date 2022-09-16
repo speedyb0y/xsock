@@ -795,10 +795,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         WIRE_PAYLOAD_SIZE(ipSize)
         ));
 
-    skb->data             = WIRE_ETH(wire);
-    skb->mac_header       = WIRE_ETH(wire) - SKB_HEAD(skb);
-    skb->network_header   = WIRE_IP (wire) - SKB_HEAD(skb);
     skb->transport_header = WIRE_UDP(wire) - SKB_HEAD(skb);
+    skb->network_header   = WIRE_IP (wire) - SKB_HEAD(skb);
+    skb->mac_header       = WIRE_ETH(wire) - SKB_HEAD(skb);
+    skb->data             = WIRE_ETH(wire);
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
     skb->tail             = WIRE_ETH(wire) - SKB_HEAD(skb) + ETH_HLEN + ipSize;
 #else
