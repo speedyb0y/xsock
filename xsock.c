@@ -129,10 +129,10 @@ typedef struct net_device_ops net_device_ops_s;
 #define WIRE_ETH(wire)     PTR(&(wire)->eDst)
 #define WIRE_IP(wire)      PTR(&(wire)->iVersion)
 #define WIRE_UDP(wire)     PTR(&(wire)->uSrc)
-#define WIRE_PAYLOAD(wire) PTR(&(wire)->tFlags)
+#define WIRE_PAYLOAD(wire) (PTR(wire) + sizeof(xsock_wire_s))
 
 #define WIRE_PAYLOAD_SIZE(ipSize) (ipSize - ( \
-    - sizeof(xsock_wire_s) \
+      sizeof(xsock_wire_s) - \
     offsetof(xsock_wire_s, iVersion) \
     ))
 
