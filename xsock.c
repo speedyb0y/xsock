@@ -60,6 +60,7 @@ typedef struct net_device_ops net_device_ops_s;
 #define _IP4(x) BE32(x)
 
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
+#define XSOCK_ROUTER      XCONF_XSOCK_ROUTER_IS
 #define XSOCK_PORT        XCONF_XSOCK_PORT
 #define XSOCK_HOSTS_N     XCONF_XSOCK_HOSTS_N
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
@@ -70,6 +71,10 @@ typedef struct net_device_ops net_device_ops_s;
 
 #define VPORT_CLT 4000
 #define VPORT_SRV 2000
+
+#if XSOCK_SERVER == XSOCK_ROUTER
+#error "AMBIGUOUS SERVER/ROUTER"
+#endif
 
 #if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
 #error "BAD XSOCK_PORT"
@@ -281,7 +286,7 @@ typedef struct xsock_cfg_s {
 
 static net_device_s* xdev;
 
-#if XSOCK_SERVER
+#if XSOCK_SERVER || XSOCK_ROUTER
 static xsock_host_s hosts[XSOCK_HOSTS_N];
 #else
 static xsock_host_s host[1];
@@ -659,18 +664,19 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     const uint cid = BE16(orig->tSrc);
 #endif
 
-    if (hid
-#if XSOCK_SERVER
-        >= XSOCK_HOSTS_N
-#else
-        != XSOCK_HOST_ID
-#endif
-    ) {
+#if XSOCK_SERVER || XSOCK_ROUTER
+    if (hid >= XSOCK_HOSTS_N) {
         printk("OUT: DROP: BAD HID\n");
         goto drop;
     }
+#else
+    if (hid != XSOCK_HOST_ID) {
+        printk("OUT: DROP: NOT MY HID\n");
+        goto drop;
+    }
+#endif
 
-#if XSOCK_SERVER
+#if XSOCK_SERVER || XSOCK_ROUTER
     xsock_host_s* const host = &hosts[hid];
 #endif
     xsock_conn_s* const conn = &host->conns[cid];
