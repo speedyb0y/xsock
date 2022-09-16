@@ -511,8 +511,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = WIRE_IP(wire);
-    skb->mac_header      = WIRE_IP(wire) - PTR(skb->head);
-    skb->network_header  = WIRE_IP(wire) - PTR(skb->head);
+    skb->mac_header      = WIRE_IP(wire) - SKB_HEAD(skb);
+    skb->network_header  = WIRE_IP(wire) - SKB_HEAD(skb);
     skb->len             = ipSize;
     skb->mac_len         = 0;
     skb->ip_summed       = CHECKSUM_UNNECESSARY;
