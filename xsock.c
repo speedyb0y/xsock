@@ -132,9 +132,9 @@ typedef struct net_device_ops net_device_ops_s;
 #define WIRE_PAYLOAD(wire) PTR(&(wire)->tFlags)
 
 #define WIRE_PAYLOAD_SIZE(ipSize) (ipSize - ( \
-	offsetof(xsock_wire_s, iVersion) \
+    offsetof(xsock_wire_s, iVersion) \
   - offsetof(xsock_wire_s, tFlags) \
-	))
+    ))
 
 //
 typedef u32 xsock_wire_hash_t;
@@ -465,8 +465,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     // DECRYPT AND CONFIRM AUTHENTICITY
     if (wire->xHash != BE32(xsock_in_decrypt(hid, cid,
-		WIRE_PAYLOAD(wire),
-		WIRE_PAYLOAD_SIZE(ipSize)))) {
+        WIRE_PAYLOAD(wire),
+        WIRE_PAYLOAD_SIZE(ipSize)))) {
         printk("IN: DROP: BAD HASH\n");
         goto drop;
     }
@@ -736,8 +736,8 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
-	//
-	const uint ipSize = origSize + sizeof(u32);
+    //
+    const uint ipSize = origSize + sizeof(u32);
 
     // MOVE ANTES DE SOBRESCREVER
     wire->tSeq2       = orig->tSeq;
@@ -767,9 +767,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // ENCODE
     wire->xHash = BE32(xsock_out_encrypt(hid, cid,
-		WIRE_PAYLOAD(wire),
-		WIRE_PAYLOAD_SIZE(ipSize)
-		));
+        WIRE_PAYLOAD(wire),
+        WIRE_PAYLOAD_SIZE(ipSize)
+        ));
 
     skb->data             = WIRE_ETH(wire);
     skb->mac_header       = WIRE_ETH(wire) - SKB_HEAD(skb);
