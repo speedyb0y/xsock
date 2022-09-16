@@ -540,8 +540,15 @@ drop:
 
 static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
-    if (skb_linearize(skb))
+    if (skb->protocol !=  BE16(ETH_P_IP)) {
+        printk("OUT: DROP: NOT IPV4\n");
         goto drop;
+    }
+
+    if (skb_linearize(skb)) {
+        printk("OUT: DROP: NON LINEAR\n");
+        goto drop;
+    }
 
     xsock_wire_s* const wire = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersionTOS);
 
@@ -566,8 +573,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #if XSOCK_SERVER
     const uint hid = BE32(wire->iAddrs[1]) & 0xFF;
 
-    if (hid >= XSOCK_HOSTS_N)
+    if (hid >= XSOCK_HOSTS_N) {
+        printk("OUT: DROP: BAD HID\n");
         goto drop;
+    }
 
     xsock_host_s* const host = &hosts[hid];
 
@@ -657,9 +666,11 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         }
 
         // PATH INUSABLE
-        if (!--c)
+        if (!--c) {
             // NENHUM PATH DISPONÍVEL
+            printk("OUT: DROP: NO AVAILABLE PATH\n");
             goto drop_unlock;
+        }
 
         // GO TO NEXT PATH
         pid++;
@@ -705,11 +716,8 @@ wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
 
 drop_unlock:
     spin_unlock_irq(&host->lock);
-    printk("OUT: UNLOCKED\n");
 
 drop:
-    printk("OUT: DROP\n");
-
     dev_kfree_skb(skb);
 
     return NETDEV_TX_OK;
