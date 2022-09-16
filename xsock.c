@@ -419,14 +419,18 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 || WIRE_ETH(wire)                 < SKB_HEAD(skb)
          || wire->iVersion != 0x45
          || wire->iProtocol != IPPROTO_UDP
-         || wire->iFrag)
+         || wire->iFrag
+#if !XSOCK_SERVER // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
+         || wire->uDst != BE16(XSOCK_PORT)
+#endif
+        return RX_HANDLER_PASS;
+    )
         return RX_HANDLER_PASS;
 
 #if XSOCK_SERVER
     const uint srvPort = BE16(wire->uDst);
 #else
     const uint srvPort = BE16(wire->uSrc);
-    const uint cltPort = BE16(wire->uDst);
 #endif
 
     // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
@@ -434,10 +438,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (srvPort < PORT(0, 0)
      || srvPort > PORT(XSOCK_HOSTS_N - 1,
                        XSOCK_PATHS_N - 1))
-#else
-    if (cltPort != XSOCK_PORT)
-#endif
         return RX_HANDLER_PASS;
+#endif
 
     // IDENTIFY HOST, PATH AND CONN
     const uint hid = PORT_HID(srvPort);
