@@ -132,15 +132,15 @@ typedef struct net_device_ops net_device_ops_s;
 #define WIRE_PAYLOAD(wire) PTR(&(wire)->tFlags)
 
 #define WIRE_PAYLOAD_SIZE(ipSize) (ipSize - ( \
+    - sizeof(xsock_wire_s) \
     offsetof(xsock_wire_s, iVersion) \
-  - offsetof(xsock_wire_s, tFlags) \
     ))
 
 //
 typedef u32 xsock_wire_hash_t;
 
 // EXPECTED SIZE
-#define XSOCK_WIRE_SIZE 56
+#define XSOCK_WIRE_SIZE 48
 
 typedef struct xsock_wire_s {
     u16 _align;
@@ -159,12 +159,9 @@ typedef struct xsock_wire_s {
     u32 iDst;
     u16 uSrc;
     u16 uDst;
-    u16 uSize;     // tSeq
-    u16 uChecksum; // tSeq
-    u32 xHash;     // tAck
-    u16 tFlags;
-    u16 tWindow;
-    u32 tSeq2;     // tChecksum, tUrgent
+    u16 uSize;
+    u16 uChecksum;
+    u32 xHash; // tSeq
 } xsock_wire_s;
 
 #define XSOCK_ORIG_SIZE 40
@@ -458,7 +455,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     if (pid >= XSOCK_PATHS_N)
         goto drop;
 
-    // GET THE SIZE OF THE ORIGINAL PACKET
+    // GET THE SIZE OF THE ENCAPSULATED PACKET
     const uint ipSize = BE16(wire->iSize);
 
     // DROP INCOMPLETE PACKETS
