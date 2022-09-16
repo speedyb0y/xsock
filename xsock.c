@@ -207,7 +207,7 @@ typedef struct xsock_path_s {
 // EXPECTED SIZE
 #define XSOCK_CONN_SIZE 8
 
-#define XSOCK_CONN_BURST_MASK 0x3ffffffffffffffULL
+#define XSOCK_CONN_BURST_MASK ((1ULL << 58) - 1)
 
 typedef struct xsock_conn_s {
     u64 burst:58,
