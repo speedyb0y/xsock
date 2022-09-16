@@ -169,11 +169,11 @@ typedef struct xsock_wire_s {
     u16 uSize;
     u16 uChecksum;
 // 16 TCP REMAINING
-    u32 xHash; // tSeq
+    u32 xHash;
     u32 tAck;
     u16 tFlags;
     u16 tWindow;
-    u32 tSeq2;
+    u32 tSeq; // CHECKSUM, URGENT
 // TCP PAYLOAD
 } xsock_wire_s;
 
@@ -763,8 +763,6 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
-    // MOVE ANTES DE SOBRESCREVER
-    orig->tSeq2       = orig->tSeq;
     // RE-ENCAPSULATE
  // wire->iVersion
  // wire->iTOS
@@ -786,6 +784,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     wire->uSize       = BE16(ipSize - 20);
     wire->uChecksum   = 0;
     wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
+    wire->tSeq        = wire->xHash;
 
     spin_unlock_irq(&host->lock);
 
