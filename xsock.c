@@ -614,6 +614,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // SALVA ANTES DE SOBRESCREVER
     wire->tSeq2       = wire->tSeq;
+    // ENCAPSULA ANTES DO SPINLOCK
     wire->uSize       = BE16(ipSize - 20);
     wire->uChecksum   = 0;
     wire->iCID        = BE16(cid);
@@ -625,7 +626,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 
     // ENCODE ANTES DO SPINLOCK
     *wire_hash(wire, ipSize - sizeof(wire_hash_t))
-        = BE32(xsock_out_encrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 32));
+        = BE32(xsock_out_encrypt(hid, cid, WIRE_PAYLOAD(wire), ipSize - 20 - 8 - 4));
 
     spin_lock_irq(&host->lock);
 
@@ -725,9 +726,9 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
 
     skb->data             = WIRE_ETH(wire);
-    skb->mac_header       = WIRE_ETH(wire) - PTR(skb->head);
-    skb->network_header   = WIRE_IP (wire) - PTR(skb->head);
-    skb->transport_header = WIRE_UDP(wire) - PTR(skb->head);
+    skb->mac_header       = WIRE_ETH(wire) - SKB_HEAD(skb);
+    skb->network_header   = WIRE_IP (wire) - SKB_HEAD(skb);
+    skb->transport_header = WIRE_UDP(wire) - SKB_HEAD(skb);
     skb->mac_len          = ETH_HLEN;
     skb->len              = ETH_HLEN + ipSize;
     skb->ip_summed        = CHECKSUM_NONE;
