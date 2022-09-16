@@ -637,7 +637,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
      || orig->iSrc != BE32(VADDR_SRV)
      || orig->tSrc != BE16(VPORT_SRV)
 #else
-     || orig->iSrc != BE32(VADDR_CLT | XSOCK_HOST_ID)
+     || orig->iSrc != BE32(VADDR_CLT + hid)
      || orig->iDst != BE32(VADDR_SRV)
      || orig->tDst != BE16(VPORT_SRV)
 #endif
@@ -647,7 +647,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
 #if XSOCK_SERVER
-    const uint hid = BE32(orig->iDst) & 0xFF;
+    const uint hid = BE32(orig->iDst) - VADDR_CLT;
 
     if (hid >= XSOCK_HOSTS_N) {
         printk("OUT: DROP: BAD HID\n");
