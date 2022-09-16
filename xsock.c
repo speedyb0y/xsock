@@ -743,8 +743,14 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     conn->cdown = cdown - !!cdown;
     conn->burst = now + CONN_BURST;
 
-    //
-    xsock_wire_s* const wire = PTR(&orig->tAck) - sizeof(xsock_wire_s);
+    // REMEMBER AFTER UNLOCKING
+    net_device_s* const itfc = path->itfc;
+
+    // AMBOS COMPARTILHAM O MESMO FIM
+    // ENTAO VAI PARA O FIM DE UM, DEPOIS VOLTA PARA O COMEÇO DO OUTRO
+    xsock_wire_s* const wire = PTR(orig)
+        + sizeof(xsock_orig_s)
+        - sizeof(xsock_wire_s;
 
     //
     if (WIRE_ETH(wire) < SKB_HEAD(skb)) {
@@ -753,13 +759,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
     //
-    net_device_s* const itfc = path->itfc;
+    const uint ipSize = origSize + sizeof(wire->xHash);
 
    ((u64*)WIRE_ETH(wire))[0] = ((u64*)(&path->eDst))[0];
    ((u64*)WIRE_ETH(wire))[1] = ((u64*)(&path->eDst))[1];
-
-    //
-    const uint ipSize = origSize + sizeof(u32);
 
     // MOVE ANTES DE SOBRESCREVER
     orig->tSeq2       = orig->tSeq;
