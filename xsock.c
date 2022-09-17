@@ -477,10 +477,17 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     const uint cid = BE16(wire->iCID);
 
     // VALIDATE HOST ID
+#if XSOCK_SERVER || XSOCK_ROUTER
     if (hid >= XSOCK_HOSTS_N) {
         printk("IN: DROP: BAD HID\n");
         goto drop;
     }
+#else
+    if (hid != XSOCK_HOST_ID) {
+        printk("IN: DROP: NOT MY HID\n");
+        goto drop;
+    }
+#endif
 
     // VALIDATE PATH ID
     if (pid >= XSOCK_PATHS_N) {
