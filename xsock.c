@@ -64,14 +64,12 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_ROUTER      XCONF_XSOCK_ROUTER_IS
 #define XSOCK_SERVER_PORT XCONF_XSOCK_SERVER_PORT
 #define XSOCK_CLIENT_PORT XCONF_XSOCK_CLIENT_PORT
-#define XSOCK_HOSTS_N     XCONF_XSOCK_HOSTS_N
+#define XSOCK_CLIENTS_N   XCONF_XSOCK_CLIENTS_N
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
 #define XSOCK_HOST_ID     XCONF_XSOCK_HOST_ID
 
 #define VADDR_CLT 0xC0000000U // 192.0.0.0
 #define VADDR_SRV 0xC00000FFU // 192.0.0.255
-
-#define VPORT_CLT 4000
 #define VPORT_SRV 2000
 
 #if XSOCK_SERVER && XSOCK_ROUTER
@@ -86,8 +84,8 @@ typedef struct net_device_ops net_device_ops_s;
 #error "BAD XSOCK_SERVER_PORT"
 #endif
 
-#if ! (1 <= XSOCK_HOSTS_N && XSOCK_HOSTS_N <= 254)
-#error "BAD XSOCK_HOSTS_N"
+#if ! (1 <= XSOCK_CLIENTS_N && XSOCK_CLIENTS_N <= 254)
+#error "BAD XSOCK_CLIENTS_N"
 #endif
 
 #if ! (1 <= XSOCK_PATHS_N && XSOCK_PATHS_N <= 4)
@@ -101,20 +99,20 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE HOST AND PATH
-#define TPORT(hid, pid) (XSOCK_SERVER_PORT + (hid)*10 + (pid))
+#define TPORT(cid, pid) (XSOCK_SERVER_PORT + (cid)*10 + (pid))
 #define TPORT_HID(port) (((uint)(port) - XSOCK_SERVER_PORT) / 10)
 #define TPORT_PID(port) (((uint)(port) - XSOCK_SERVER_PORT) % 10)
 
 // O ULTIMO HOST E ULTIMO PATH TEM QUE DAR UMA PORTA VALIDA
-#if TPORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
-#error "BAD XSOCK_SERVER_PORT / XSOCK_HOSTS_N / XSOCK_PATHS_N"
+#if TPORT(XSOCK_CLIENTS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
+#error "BAD XSOCK_SERVER_PORT / XSOCK_CLIENTS_N / XSOCK_PATHS_N"
 #endif
 
 // 0xFFFF + 1
 #define XSOCK_CONNS_N 65536
 
 #if XSOCK_SERVER
-#define printk_host(msg, ...) printk("XSOCK: HOST: %u " msg, hid, ##__VA_ARGS__)
+#define printk_host(msg, ...) printk("XSOCK: HOST: %u " msg, cid, ##__VA_ARGS__)
 #else
 #define printk_host(msg, ...) printk("XSOCK: " msg, ##__VA_ARGS__)
 #endif
@@ -167,7 +165,7 @@ typedef struct xsock_wire_s {
     u8  iVersion;
     u8  iTOS;
     u16 iSize;
-    u16 iCID; // CONNECTION ID (CLIENT SOURCE (EPHEMERAL) PORT)
+    u16 iVPT; // CLIENT VIRTUAL PORT
     u16 iFrag;
     u8  iTTL;
     u8  iProtocol;
@@ -268,12 +266,12 @@ typedef struct xsock_conn_s {
         pid:2;
 } xsock_conn_s;
 
-typedef struct xsock_host_s {
+typedef struct xsock_client_s {
     spinlock_t lock;
     char _pad[CACHE_LINE_SIZE - sizeof(spinlock_t)];
     xsock_path_s paths[XSOCK_PATHS_N];
     xsock_conn_s conns[XSOCK_CONNS_N];
-} xsock_host_s;
+} xsock_client_s;
 
 typedef struct xsock_cfg_path_s {
     char itfc[IFNAMSIZ];
@@ -293,9 +291,9 @@ typedef struct xsock_cfg_s {
 static net_device_s* xdev;
 
 #if XSOCK_SERVER || XSOCK_ROUTER
-static xsock_host_s hosts[XSOCK_HOSTS_N];
+static xsock_client_s clients[XSOCK_CLIENTS_N];
 #else
-static xsock_host_s host[1];
+static xsock_client_s client[1];
 #endif
 
 static const xsock_cfg_s cfg = {
@@ -467,24 +465,24 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
 #if XSOCK_SERVER
     if (srvPort < TPORT(0, 0)
-     || srvPort > TPORT(XSOCK_HOSTS_N - 1,
+     || srvPort > TPORT(XSOCK_CLIENTS_N - 1,
                         XSOCK_PATHS_N - 1))
         return RX_HANDLER_PASS;
 #endif
 
-    // IDENTIFY HOST, PATH AND CONN
-    const uint hid = TPORT_HID(srvPort);
+    // IDENTIFY CLIENT, PATH AND CONN
+    const uint cid = TPORT_HID(srvPort);
     const uint pid = TPORT_PID(srvPort);
-    const uint cid = BE16(wire->iCID);
+    const uint vpt = BE16(wire->iVPT);
 
-    // VALIDATE HOST ID
+    // VALIDATE CLIENT ID
 #if XSOCK_SERVER || XSOCK_ROUTER
-    if (hid >= XSOCK_HOSTS_N) {
+    if (cid >= XSOCK_CLIENTS_N) {
         printk("IN: DROP: BAD HID\n");
         goto drop;
     }
 #else
-    if (hid != XSOCK_HOST_ID) {
+    if (cid != XSOCK_HOST_ID) {
         printk("IN: DROP: NOT MY HID\n");
         goto drop;
     }
@@ -513,7 +511,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     }
 
     // DECRYPT AND CONFIRM AUTHENTICITY
-    if (wire->xHash != BE32(xsock_in_decrypt(hid, cid,
+    if (wire->xHash != BE32(xsock_in_decrypt(cid, vpt,
         WIRE_PAYLOAD(wire),
         WIRE_PAYLOAD_SIZE(ipSize)))) {
         printk("IN: DROP: BAD HASH\n");
@@ -529,12 +527,12 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
      + *(u32*)&wire->uSrc // VAI PEGAR AMBAS AS PORTAS MAS O SERVER PORT É FIXO PARA ESTE HOST:PATH
     ;
 
-    xsock_host_s* const host = &hosts[hid];
-    xsock_path_s* const path = &host->paths[pid];
+    xsock_client_s* const client = &clients[cid];
+    xsock_path_s* const path = &client->paths[pid];
 
     unsigned long irqStatus;
 
-    spin_lock_irqsave(&host->lock, irqStatus);
+    spin_lock_irqsave(&client->lock, irqStatus);
 
     if (unlikely(path->iHash != hash)) {
 
@@ -560,7 +558,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 
     path->iActive = jiffies + path->iTimeout*HZ;
 
-    spin_unlock_irqrestore(&host->lock, irqStatus);
+    spin_unlock_irqrestore(&client->lock, irqStatus);
 #endif
 
     // É TUDO MENOS O HASH
@@ -576,15 +574,15 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     orig->iProtocol = IPPROTO_TCP;
     orig->iChecksum = 0;
 #if XSOCK_SERVER
-    orig->iSrc      = BE32(VADDR_CLT + hid);
+    orig->iSrc      = BE32(VADDR_CLT + cid);
     orig->iDst      = BE32(VADDR_SRV);
-    orig->tSrc      = BE16(cid);
-    orig->tDst      = BE16(VPORT_CLT);
+    orig->tSrc      = BE16(vpt);
+    orig->tDst      = BE16(VPORT_SRV);
 #else
     orig->iSrc      = BE32(VADDR_SRV);
-    orig->iDst      = BE32(VADDR_CLT + hid);
-    orig->tSrc      = BE16(VPORT_CLT);
-    orig->tDst      = BE16(cid);
+    orig->iDst      = BE32(VADDR_CLT + cid);
+    orig->tSrc      = BE16(VPORT_SRV);
+    orig->tDst      = BE16(vpt);
 #endif
     orig->tSeq      = orig->tSeq2;
     orig->tSeq2     = 0;
@@ -670,33 +668,33 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     }
 
 #if XSOCK_SERVER
-    const uint hid = BE32(orig->iDst) - VADDR_CLT;
-    const uint cid = BE16(orig->tDst);
+    const uint cid = BE32(orig->iDst) - VADDR_CLT;
+    const uint vpt = BE16(orig->tDst);
 #else
-    const uint hid = BE32(orig->iSrc) - VADDR_CLT;
-    const uint cid = BE16(orig->tSrc);
+    const uint cid = BE32(orig->iSrc) - VADDR_CLT;
+    const uint vpt = BE16(orig->tSrc);
 #endif
 
 #if XSOCK_SERVER || XSOCK_ROUTER
-    if (hid >= XSOCK_HOSTS_N) {
+    if (cid >= XSOCK_CLIENTS_N) {
         printk("OUT: DROP: BAD HID\n");
         goto drop;
     }
 #else
-    if (hid != XSOCK_HOST_ID) {
+    if (cid != XSOCK_HOST_ID) {
         printk("OUT: DROP: NOT MY HID\n");
         goto drop;
     }
 #endif
 
 #if XSOCK_SERVER || XSOCK_ROUTER
-    xsock_host_s* const host = &hosts[hid];
+    xsock_client_s* const client = &clients[cid];
 #endif
-    xsock_conn_s* const conn = &host->conns[cid];
+    xsock_conn_s* const conn = &client->conns[vpt];
 
     const u64 now = ((u64)jiffies) & XSOCK_CONN_BURST_MASK;
 
-    spin_lock_irq(&host->lock);
+    spin_lock_irq(&client->lock);
 
     // FORCE USING ALL PATHS
     //      -- TO ALLOW SERVER TO DISCOVER THEM
@@ -718,7 +716,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     // CHOOSE PATH
     xsock_path_s* path;
 
-    loop { path = &host->paths[(pid %= XSOCK_PATHS_N)];
+    loop { path = &client->paths[(pid %= XSOCK_PATHS_N)];
 
         if (path->oPkts && path->itfc && path->itfc->flags & IFF_UP) {
             // ACHOU UM PATH EXISTENTE E OK
@@ -787,17 +785,17 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     wire->iDst = path->iDst;
     wire->uDst = path->uDst;
 
-    spin_unlock_irq(&host->lock);
+    spin_unlock_irq(&client->lock);
 
     // FINISH AND ENCODE
-    wire->iCID        = BE16(cid);
+    wire->iVPT        = BE16(vpt);
     wire->iSize       = BE16(ipSize);
     wire->iFrag       = 0;
     wire->iTTL        = 64;
     wire->iProtocol   = IPPROTO_UDP;
     wire->iChecksum   = 0;
 #if XSOCK_SERVER
-    wire->uSrc        = BE16(TPORT(hid, pid));
+    wire->uSrc        = BE16(TPORT(cid, pid));
 #else
     wire->uSrc        = BE16(XSOCK_CLIENT_PORT);
 #endif
@@ -805,7 +803,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     wire->uChecksum   = 0;
     wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
     wire->tSeq        = wire->xHash;
-    wire->xHash       = BE32(xsock_out_encrypt(hid, cid,
+    wire->xHash       = BE32(xsock_out_encrypt(cid, vpt,
         WIRE_PAYLOAD(wire),
         WIRE_PAYLOAD_SIZE(ipSize)
         ));
@@ -835,7 +833,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     return NETDEV_TX_OK;
 
 drop_unlock:
-    spin_unlock_irq(&host->lock);
+    spin_unlock_irq(&client->lock);
 
 drop:
     dev_kfree_skb(skb);
@@ -925,19 +923,19 @@ static int __init xsock_init (void) {
 
     // INITIALIZE HOSTS
 #if XSOCK_SERVER || XSOCK_ROUTER
-    foreach (hid, XSOCK_HOSTS_N) {
+    foreach (cid, XSOCK_CLIENTS_N) {
 
-        xsock_host_s* const host = &hosts[hid];
+        xsock_client_s* const client = &clients[cid];
 #endif
         printk_host("INITIALIZING\n");
 
         //
-        spin_lock_init(&host->lock);
+        spin_lock_init(&client->lock);
 
         // INITIALIZE CONNECTIONS
-        foreach (cid, XSOCK_CONNS_N) {
-            xsock_conn_s* const conn = &host->conns[cid];
-            conn->pid   = cid % XSOCK_PATHS_N;
+        foreach (vpt, XSOCK_CONNS_N) {
+            xsock_conn_s* const conn = &client->conns[vpt];
+            conn->pid   = vpt % XSOCK_PATHS_N;
             conn->cdown = 0;
             conn->burst = 0;
         }
@@ -945,7 +943,7 @@ static int __init xsock_init (void) {
         // INITIALIZE PATHS
         foreach (pid, XSOCK_PATHS_N) {
 
-            xsock_path_s* const path = &host->paths[pid];
+            xsock_path_s* const path = &client->paths[pid];
 
 #if XSOCK_SERVER
             const xsock_cfg_path_s* const this = &cfg.srv[pid];
@@ -1053,13 +1051,13 @@ static void __exit xsock_exit (void) {
 
     //
 #if XSOCK_SERVER || XSOCK_ROUTER
-    foreach (hid, XSOCK_HOSTS_N) {
+    foreach (cid, XSOCK_CLIENTS_N) {
 
-        xsock_host_s* const host = &hosts[hid];
+        xsock_client_s* const client = &clients[cid];
 #endif
         foreach (pid, XSOCK_PATHS_N) {
 
-            net_device_s* itfc = host->paths[pid].itfc;
+            net_device_s* itfc = client->paths[pid].itfc;
 
             if (itfc) {
 
