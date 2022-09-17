@@ -7,9 +7,13 @@ XSOCK_TABLE=5
 (make && insmod xsock-clt.ko)
 
 echo scalable > /proc/sys/net/ipv4/tcp_congestion_control
+echo 0 > /proc/sys/net/ipv4/tcp_slow_start_after_idle
 echo 8000 > /proc/sys/net/ipv4/tcp_max_reordering
 echo 1000 > /proc/sys/net/ipv4/tcp_reordering
 echo 1 > /proc/sys/net/ipv6/conf/xsock/disable_ipv6
+
+tee --output-error=warn /proc/sys/net/{core,ipv4}/*mem* <<< "$[1024*1024*1024]"
+tee --output-error=warn /proc/sys/net/{core,ipv4}/*mem* <<< "$[1024*1024*1024] $[1024*1024*1024] $[1024*1024*1024]"
 
 ip link set dev xsock up
 
