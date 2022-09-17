@@ -825,6 +825,10 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
     skb->ip_summed        = CHECKSUM_NONE;
     skb->dev              = itfc;
 
+
+    printk("ENVIANDO skb->len %u skb->dev %s cid %u vpt %u pid %u\n",
+        skb->len, skb->dev->name, cid, vpt, pid);
+        
     // -- THE FUNCTION CAN BE CALLED FROM AN INTERRUPT
     // -- WHEN CALLING THIS METHOD, INTERRUPTS MUST BE ENABLED
     // -- REGARDLESS OF THE RETURN VALUE, THE SKB IS CONSUMED
