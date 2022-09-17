@@ -16,8 +16,8 @@ tee --output-error=warn /proc/sys/net/{core,ipv4}/*mem* <<< "$[1024*1024*1024] $
 # TODO: FIXME: REMOVE O BBR
 # TODO: FIXME: REMOVE AQUELE SCALING
 
-#tc qdisc  replace dev eth0 root pfifo_fast
-#ip link set dev eth0 txqueuelen 65536
+tc qdisc  replace dev ens3 root pfifo_fast
+ip link set dev ens3 txqueuelen 65536
 
 ip link set dev xsock up
 
