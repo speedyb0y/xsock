@@ -23,5 +23,5 @@ ip -4 addr add dev xsock ${XSOCK_PREFIX}.${XSOCK_HOST}
 
 #rttvar TIME (Linux 2.3.15+ only)
 #ssthresh NUMBER (Linux 2.3.15+ only)
-ip -4 route add table ${XSOCK_TABLE} dev xsock mtu $[${ISP_MTU}-8] advmss $[${ISP_MTU}-8-40] src ${XSOCK_PREFIX}.${XSOCK_HOST} ${XSOCK_PREFIX}.255 rtt 210ms rto_min 320ms
+ip -4 route add table ${XSOCK_TABLE} dev xsock mtu $[${ISP_MTU}-4] advmss $[${ISP_MTU}-4] src ${XSOCK_PREFIX}.${XSOCK_HOST} ${XSOCK_PREFIX}.255 rtt 210ms rto_min 320ms
 ip -4 route flush cache
