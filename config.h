@@ -4,7 +4,7 @@
 #define VPS_C 39
 #define VPS_D 49
 
-//#define XCONF_XSOCK_HOST_ID 0
+//#define XCONF_XSOCK_CLIENT_ID 0
 //#define IP_0_D 50
 //#define ITFC0 "eth0"
 //#define ITFC1 "eth1"
@@ -16,7 +16,7 @@
 //#define  GW1 "\xcc\xed\x21\x96\x99\xc0"
 //#define  GW2 "\x90\x55\xde\xa1\xcd\xf0"
 
-#define XCONF_XSOCK_HOST_ID 1
+#define XCONF_XSOCK_CLIENT_ID 1
 #define IP_0_C 0
 #define IP_0_D 20
 #define IP_1_C 100

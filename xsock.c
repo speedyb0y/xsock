@@ -63,10 +63,10 @@ typedef struct net_device_ops net_device_ops_s;
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_ROUTER      XCONF_XSOCK_ROUTER_IS
 #define XSOCK_SERVER_PORT XCONF_XSOCK_SERVER_PORT
-#define XSOCK_CLIENT_PORT XCONF_XSOCK_CLIENT_PORT
 #define XSOCK_CLIENTS_N   XCONF_XSOCK_CLIENTS_N
+#define XSOCK_CLIENT_ID   XCONF_XSOCK_HOST_ID
+#define XSOCK_CLIENT_PORT XCONF_XSOCK_CLIENT_PORT
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
-#define XSOCK_HOST_ID     XCONF_XSOCK_HOST_ID
 
 #define VADDR_CLT 0xC0000000U // 192.0.0.0
 #define VADDR_SRV 0xC00000FFU // 192.0.0.255
@@ -93,8 +93,8 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 #if XSOCK_SERVER
-#if ! (0 <= XSOCK_HOST_ID && XSOCK_HOST_ID < 0xFF)
-#error "BAD XSOCK_HOST_ID"
+#if ! (0 <= XSOCK_CLIENT_ID && XSOCK_CLIENT_ID < 0xFF)
+#error "BAD XSOCK_CLIENT_ID"
 #endif
 #endif
 
@@ -482,7 +482,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         goto drop;
     }
 #else
-    if (cid != XSOCK_HOST_ID) {
+    if (cid != XSOCK_CLIENT_ID) {
         printk("IN: DROP: NOT MY HID\n");
         goto drop;
     }
@@ -681,7 +681,7 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
         goto drop;
     }
 #else
-    if (cid != XSOCK_HOST_ID) {
+    if (cid != XSOCK_CLIENT_ID) {
         printk("OUT: DROP: NOT MY HID\n");
         goto drop;
     }
@@ -983,7 +983,7 @@ static int __init xsock_init (void) {
             path->iActive    = 0;
             path->iHash      = 0;
 #else
-            path->uDst       = BE16(TPORT(XSOCK_HOST_ID, pid));
+            path->uDst       = BE16(TPORT(XSOCK_CLIENT_ID, pid));
             path->reserved0  = 0;
             path->reserved1  = 0;
             path->reserved2  = 0;
