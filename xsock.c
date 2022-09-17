@@ -435,7 +435,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
         printk("IN: DROP: NON LINEAR\n");
         goto drop;
     }
-    
+
     xsock_orig_s* const orig = SKB_DATA(skb) - offsetof(xsock_wire_s, iVersion);
 
     const xsock_wire_s* const wire = PTR(orig);
@@ -497,8 +497,8 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
     // GET THE SIZE OF THE ENCAPSULATED PACKET
     uint ipSize = BE16(wire->iSize);
 
-    // 
-    if (ipSize < sizeof(xsock_wire_s) - offsetof(xsock_wire_s, iVersion)) {    
+    //
+    if (ipSize < sizeof(xsock_wire_s) - offsetof(xsock_wire_s, iVersion)) {
         printk("IN: DROP: SMALL\n");
         goto drop;
     }
