@@ -61,7 +61,8 @@ typedef struct net_device_ops net_device_ops_s;
 
 #define XSOCK_SERVER      XCONF_XSOCK_SERVER_IS
 #define XSOCK_ROUTER      XCONF_XSOCK_ROUTER_IS
-#define XSOCK_PORT        XCONF_XSOCK_PORT
+#define XSOCK_SERVER_PORT XCONF_XSOCK_SERVER_PORT
+#define XSOCK_CLIENT_PORT XCONF_XSOCK_CLIENT_PORT
 #define XSOCK_HOSTS_N     XCONF_XSOCK_HOSTS_N
 #define XSOCK_PATHS_N     XCONF_XSOCK_PATHS_N
 #define XSOCK_HOST_ID     XCONF_XSOCK_HOST_ID
@@ -76,8 +77,12 @@ typedef struct net_device_ops net_device_ops_s;
 #error "AMBIGUOUS SERVER/ROUTER"
 #endif
 
-#if ! (1 <= XSOCK_PORT && XSOCK_PORT <= 0xFFFF)
-#error "BAD XSOCK_PORT"
+#if ! (1 <= XSOCK_CLIENT_PORT && XSOCK_CLIENT_PORT <= 0xFFFF)
+#error "BAD XSOCK_CLIENT_PORT"
+#endif
+
+#if ! (1 <= XSOCK_SERVER_PORT && XSOCK_SERVER_PORT <= 0xFFFF)
+#error "BAD XSOCK_SERVER_PORT"
 #endif
 
 #if ! (1 <= XSOCK_HOSTS_N && XSOCK_HOSTS_N <= 254)
@@ -95,13 +100,13 @@ typedef struct net_device_ops net_device_ops_s;
 #endif
 
 // THE ON-WIRE SERVER PORT WILL DETERMINE THE HOST AND PATH
-#define TPORT(hid, pid) (XSOCK_PORT + (hid)*10 + (pid))
-#define TPORT_HID(port) (((uint)(port) - XSOCK_PORT) / 10)
-#define TPORT_PID(port) (((uint)(port) - XSOCK_PORT) % 10)
+#define TPORT(hid, pid) (XSOCK_SERVER_PORT + (hid)*10 + (pid))
+#define TPORT_HID(port) (((uint)(port) - XSOCK_SERVER_PORT) / 10)
+#define TPORT_PID(port) (((uint)(port) - XSOCK_SERVER_PORT) % 10)
 
 // O ULTIMO HOST E ULTIMO PATH TEM QUE DAR UMA PORTA VALIDA
 #if TPORT(XSOCK_HOSTS_N - 1, XSOCK_PATHS_N - 1) > 0xFFFF
-#error "BAD XSOCK_PORT / XSOCK_HOSTS_N / XSOCK_PATHS_N"
+#error "BAD XSOCK_SERVER_PORT / XSOCK_HOSTS_N / XSOCK_PATHS_N"
 #endif
 
 // 0xFFFF + 1
@@ -447,7 +452,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
          || wire->iFrag
          || wire->iProtocol != IPPROTO_UDP
 #if !XSOCK_SERVER // SE NAO FOR NA MINHA PORTA, ENTAO NAO INTERPRETA COMO XSOCK
-         || wire->uDst != BE16(XSOCK_PORT)
+         || wire->uDst != BE16(XSOCK_CLIENT_PORT)
 #endif
     )
         return RX_HANDLER_PASS;
@@ -786,13 +791,13 @@ static netdev_tx_t xsock_out (sk_buff_s* const skb, net_device_s* const dev) {
 #if XSOCK_SERVER
     wire->uSrc        = BE16(TPORT(hid, pid));
 #else
-    wire->uSrc        = BE16(XSOCK_PORT);
+    wire->uSrc        = BE16(XSOCK_CLIENT_PORT);
 #endif
     wire->uSize       = BE16(ipSize - sizeof(struct iphdr));
     wire->uChecksum   = 0;
     wire->iChecksum   = ip_fast_csum(WIRE_IP(wire), 5);
     wire->tSeq        = wire->xHash;
-    wire->xHash = BE32(xsock_out_encrypt(hid, cid,
+    wire->xHash       = BE32(xsock_out_encrypt(hid, cid,
         WIRE_PAYLOAD(wire),
         WIRE_PAYLOAD_SIZE(ipSize)
         ));
