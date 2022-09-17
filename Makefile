@@ -25,8 +25,21 @@ CFLAGS_xsock-clt.o += -Wno-type-limits
 CFLAGS_xsock-clt.o += -Wno-unused-parameter
 CFLAGS_xsock-clt.o += -mpopcnt
 
+CFLAGS_xsock-rtr.o += -Wfatal-errors
+CFLAGS_xsock-rtr.o += -Werror
+CFLAGS_xsock-rtr.o += -Wall
+CFLAGS_xsock-rtr.o += -Wextra
+CFLAGS_xsock-rtr.o += -Wno-declaration-after-statement
+CFLAGS_xsock-rtr.o += -Wno-error=unused-parameter
+CFLAGS_xsock-rtr.o += -Wno-error=unused-function
+CFLAGS_xsock-rtr.o += -Wno-error=unused-label
+CFLAGS_xsock-rtr.o += -Wno-type-limits
+CFLAGS_xsock-rtr.o += -Wno-unused-parameter
+CFLAGS_xsock-rtr.o += -mpopcnt
+
 obj-m += xsock-srv.o
 obj-m += xsock-clt.o
+obj-m += xsock-rtr.o
 
 default:
 	$(MAKE) -C $(KBUILD) M=$(PWD) modules

@@ -2,4 +2,7 @@
 #include "config.h"
 
 #undef  XCONF_XSOCK_SERVER_IS
+#undef  XCONF_XSOCK_ROUTER_IS
+
 #define XCONF_XSOCK_SERVER_IS 1
+#define XCONF_XSOCK_ROUTER_IS 0

@@ -72,7 +72,7 @@ typedef struct net_device_ops net_device_ops_s;
 #define VPORT_CLT 4000
 #define VPORT_SRV 2000
 
-#if XSOCK_SERVER == XSOCK_ROUTER
+#if XSOCK_SERVER && XSOCK_ROUTER
 #error "AMBIGUOUS SERVER/ROUTER"
 #endif
 
@@ -911,7 +911,7 @@ static int __init xsock_init (void) {
     xdev = dev;
 
     // INITIALIZE HOSTS
-#if XSOCK_SERVER
+#if XSOCK_SERVER || XSOCK_ROUTER
     foreach (hid, XSOCK_HOSTS_N) {
 
         xsock_host_s* const host = &hosts[hid];
@@ -1021,7 +1021,7 @@ static int __init xsock_init (void) {
             } else
                 printk_host("PATH %u: INTERFACE NOT FOUND\n", pid);
         }
-#if XSOCK_SERVER
+#if XSOCK_SERVER || XSOCK_ROUTER
     }
 #endif
 
@@ -1039,7 +1039,7 @@ static void __exit xsock_exit (void) {
     }
 
     //
-#if XSOCK_SERVER
+#if XSOCK_SERVER || XSOCK_ROUTER
     foreach (hid, XSOCK_HOSTS_N) {
 
         xsock_host_s* const host = &hosts[hid];
@@ -1063,7 +1063,7 @@ static void __exit xsock_exit (void) {
                 dev_put(itfc);
             }
         }
-#if XSOCK_SERVER
+#if XSOCK_SERVER || XSOCK_ROUTER
     }
 #endif
 }
