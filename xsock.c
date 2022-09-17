@@ -586,7 +586,7 @@ static rx_handler_result_t xsock_in (sk_buff_s** const pskb) {
 #endif
     orig->tSeq      = orig->tSeq2;
     orig->tSeq2     = 0;
-    orig->iChecksum = ip_fast_csum(PTR(orig), 5);
+    orig->iChecksum = ip_fast_csum(PTR(&orig->iVersion), 5);
 
     // TODO: FIXME: SKB TRIM QUE NEM É FEITO NO ip_rcv_core()
     skb->data            = PTR(&orig->iVersion);
